@@ -1,0 +1,66 @@
+id: ACR-S-014
+version: "1.0.0"
+title: "Server-Side Request Forgery (SSRF) patterns"
+status: active
+created: "2026-03-19"
+author: "AgentCanary Core"
+confidence: medium
+severity: high
+category: unauthorized_access
+subcategory: ssrf
+description: >
+  Detects patterns where user-controlled input is used as a URL in server-side
+  requests. In MCP servers, this could allow agents to probe internal networks,
+  access cloud metadata endpoints, or reach otherwise-restricted services.
+tags:
+  - ssrf
+  - network
+  - proxy-abuse
+mitre:
+  tactics:
+    - discovery
+    - lateral-movement
+  techniques:
+    - T1046
+    - T1557
+applies_to:
+  - mcp_server
+  - npm_package
+detection:
+  check_type: static_pattern
+  patterns:
+    - id: fetch_user_url
+      description: "fetch() with user-supplied input from request object"
+      type: regex
+      value: "fetch\\s*\\(\\s*(req\\.(body|query|params|url)|user[Ii]nput|untrusted)"
+      target: file_content
+      case_sensitive: false
+    - id: axios_user_url
+      description: "HTTP client with user-supplied input from request object"
+      type: regex
+      value: "(axios|got|request)\\.(get|post|put|delete)\\s*\\(\\s*(req\\.(body|query|params)|user[Ii]nput)"
+      target: file_content
+      case_sensitive: false
+    - id: cloud_metadata_access
+      description: "Access to cloud metadata endpoints"
+      type: regex
+      value: "169\\.254\\.169\\.254|metadata\\.google|100\\.100\\.100\\.200"
+      target: file_content
+    - id: internal_network_probe
+      description: "Requests to internal network ranges"
+      type: regex
+      value: "(127\\.0\\.0\\.|10\\.0\\.|192\\.168\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.).*?(fetch|axios|http|request)"
+      target: file_content
+  condition: any
+report:
+  title: "SSRF risk detected"
+  recommendation: >
+    This code makes HTTP requests using externally-controlled URLs without
+    apparent validation. This could allow probing internal networks or accessing
+    cloud metadata endpoints. Implement URL allowlisting and block private ranges.
+false_positives:
+  - "Legitimate proxy or URL-fetching tools with proper validation"
+  - "Webhook delivery services"
+provenance:
+  source: enkrypt_promptfoo_research
+  first_seen: "2026-03-19"

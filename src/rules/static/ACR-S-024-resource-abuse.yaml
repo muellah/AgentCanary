@@ -1,0 +1,58 @@
+id: ACR-S-024
+version: "1.0.0"
+title: "Resource abuse patterns"
+status: active
+created: "2026-03-19"
+author: "AgentCanary Core"
+confidence: medium
+severity: high
+category: deceptive_behavior
+subcategory: resource-abuse
+description: >
+  Detects patterns that could cause denial of service through resource exhaustion:
+  infinite loops without breaks, fork bombs, and extremely large memory allocations.
+tags:
+  - dos
+  - resource-abuse
+  - fork-bomb
+  - infinite-loop
+mitre:
+  tactics:
+    - impact
+  techniques:
+    - T1499
+applies_to:
+  - mcp_server
+  - skill_file
+  - npm_package
+detection:
+  check_type: static_pattern
+  patterns:
+    - id: fork_bomb
+      description: "Fork bomb patterns"
+      type: regex
+      value: ":\\(\\)\\{\\s*:\\|:\\s*&\\s*\\}\\s*;\\s*:|os\\.fork\\(\\).*loop|while.*os\\.fork"
+      target: file_content
+    - id: large_allocation
+      description: "Extremely large memory allocation"
+      type: regex
+      value: "(\\[.{0,20}\\]\\s*\\*\\s*[0-9]{7,}|bytearray\\([0-9]{8,}\\)|new\\s+ArrayBuffer\\([0-9]{8,}\\))"
+      target: file_content
+    - id: system_destruction
+      description: "Destructive system commands"
+      type: regex
+      value: "(rm\\s+-rf\\s+/[^.]|dd\\s+if=/dev/(zero|urandom)\\s+of=/|mkfs\\s+/dev/)"
+      target: file_content
+  condition: any
+report:
+  title: "Resource abuse or destructive pattern detected"
+  recommendation: >
+    This code contains patterns that could crash your system — fork bombs, excessive
+    memory allocation, or destructive commands. These cause denial of service or
+    data loss. Do not install.
+false_positives:
+  - "Legitimate stress testing or benchmarking tools"
+  - "System administration utilities"
+provenance:
+  source: cisco_skill_scanner_yaml
+  first_seen: "2026-03-19"

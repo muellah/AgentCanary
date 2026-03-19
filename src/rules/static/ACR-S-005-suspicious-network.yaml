@@ -1,0 +1,76 @@
+id: ACR-S-005
+version: "1.0.0"
+title: "Suspicious outbound network requests"
+status: active
+created: "2026-03-18"
+author: "AgentCanary Core"
+confidence: medium
+severity: high
+category: data_exfiltration
+subcategory: network-beacon
+description: >
+  Detects outbound HTTP/HTTPS requests to domains that don't match the
+  tool's declared purpose. MCP servers making unexpected network calls
+  may be exfiltrating data or phoning home to C2 infrastructure.
+tags:
+  - network
+  - exfiltration
+  - beacon
+mitre:
+  tactics:
+    - exfiltration
+    - command-and-control
+  techniques:
+    - T1041
+    - T1071.001
+applies_to:
+  - mcp_server
+  - npm_package
+detection:
+  check_type: static_pattern
+  patterns:
+    - id: fetch_with_data_post
+      description: "fetch() with POST method and body containing collected data"
+      type: regex
+      value: "fetch\\s*\\([^)]*method\\s*:\\s*['\"]POST['\"]"
+      target: file_content
+    - id: hardcoded_exfil_domain
+      description: "HTTP requests to obviously suspicious domains"
+      type: regex
+      value: "https?://(exfil|evil|collect|steal|c2|beacon|data\\-collect|analytics\\-track)"
+      target: file_content
+    - id: dynamic_url_construction
+      description: "Building URLs from concatenated variables (common exfil pattern)"
+      type: regex
+      value: "https?://['\"]\\s*\\+\\s*\\w+\\s*\\+\\s*['\"]"
+      target: file_content
+    - id: webhook_patterns
+      description: "Calls to webhook services that could receive exfiltrated data"
+      type: regex
+      value: "https?://(hooks\\.slack|discord\\.com/api/webhooks|webhook\\.site|requestbin)"
+      target: file_content
+    - id: axios_post_with_data
+      description: "axios.post sending collected data to external endpoint"
+      type: regex
+      value: "axios\\.(post|put)\\s*\\([^)]*\\{.*?(data|body|payload|env|secret|token|key)"
+      target: file_content
+      case_sensitive: false
+    - id: shadow_exfil_keywords
+      description: "Exfiltration-related variable names or comments"
+      type: regex
+      value: "(exfiltrat|shadow.?analytics|intercept.?data|siphon|stolen.?data|collect.?secrets)"
+      target: file_content
+      case_sensitive: false
+  condition: any
+report:
+  title: "Suspicious outbound network request detected"
+  recommendation: >
+    Review all network calls. Verify each URL belongs to the service the
+    tool is supposed to interact with. Unexpected POST requests are the
+    highest-risk pattern.
+false_positives:
+  - "Legitimate API integrations making POST requests to known services"
+  - "Telemetry/analytics SDKs (still worth reviewing scope)"
+provenance:
+  source: manual_analysis
+  first_seen: "2026-03-18"

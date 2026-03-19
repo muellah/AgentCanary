@@ -1,0 +1,75 @@
+id: ACR-S-015
+version: "1.0.0"
+title: "Security mechanism disablement"
+status: active
+created: "2026-03-19"
+author: "AgentCanary Core"
+confidence: high
+severity: high
+category: defense_evasion
+subcategory: security-disablement
+description: >
+  Detects patterns that disable security mechanisms such as TLS verification,
+  certificate checks, or safety guards. Seen in ToxicSkills campaign where
+  skills weaken system security to enable further attacks.
+tags:
+  - defense-evasion
+  - tls-disable
+  - security-bypass
+  - toxicskills
+mitre:
+  tactics:
+    - defense-evasion
+  techniques:
+    - T1562.001
+applies_to:
+  - mcp_server
+  - skill_file
+  - npm_package
+detection:
+  check_type: static_pattern
+  patterns:
+    - id: node_tls_reject_disabled
+      description: "Node.js TLS certificate verification disabled"
+      type: regex
+      value: "NODE_TLS_REJECT_UNAUTHORIZED.*?['\"]0['\"]"
+      target: file_content
+    - id: ssl_verify_false
+      description: "SSL/TLS verification disabled"
+      type: regex
+      value: "(verify|SSL_CERT_VERIFY|VERIFY_SSL|check_hostname)\\s*[:=]\\s*(false|False|0|None)"
+      target: file_content
+      case_sensitive: false
+    - id: no_verify_flag
+      description: "--no-verify or --insecure flags"
+      type: regex
+      value: "--(no-verify|insecure|no-check-certificate)"
+      target: file_content
+    - id: disable_warnings
+      description: "Disabling security/SSL warnings"
+      type: regex
+      value: "(disable_warnings|filterwarnings.*ignore.*InsecureRequest|urllib3.*disable)"
+      target: file_content
+    - id: chmod_world_writable
+      description: "Making files world-writable"
+      type: regex
+      value: "chmod\\s+(777|666|a\\+w)"
+      target: file_content
+    - id: systemctl_disable
+      description: "Disabling system services"
+      type: regex
+      value: "systemctl\\s+(disable|stop)\\s+(firewall|ufw|iptables|selinux|apparmor)"
+      target: file_content
+  condition: any
+report:
+  title: "Security mechanism disablement detected"
+  recommendation: >
+    This code disables important security mechanisms. This is a common precursor
+    to further attacks — once security guards are down, malicious code can operate
+    freely. Legitimate tools should never disable TLS verification or system firewalls.
+false_positives:
+  - "Development/testing configurations (should not be in production skills)"
+  - "Self-signed certificate handling in controlled environments"
+provenance:
+  source: snyk_toxicskills_research
+  first_seen: "2026-03-19"

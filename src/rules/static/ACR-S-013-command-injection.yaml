@@ -1,0 +1,68 @@
+id: ACR-S-013
+version: "1.0.0"
+title: "Command injection patterns"
+status: active
+created: "2026-03-19"
+author: "AgentCanary Core"
+confidence: medium
+severity: critical
+category: remote_code_execution
+subcategory: command-injection
+description: >
+  Detects patterns where external input is interpolated into shell commands.
+  Enables arbitrary command execution if input is not sanitized.
+tags:
+  - rce
+  - command-injection
+  - shell
+mitre:
+  tactics:
+    - execution
+  techniques:
+    - T1059.004
+applies_to:
+  - mcp_server
+  - skill_file
+  - npm_package
+detection:
+  check_type: static_pattern
+  patterns:
+    - id: exec_template_literal
+      description: "exec/spawn with template literal containing variables"
+      type: regex
+      value: "(exec|execSync|spawn|spawnSync)\\s*\\(\\s*`[^`]*\\$\\{"
+      target: file_content
+    - id: exec_string_concat
+      description: "exec with string concatenation"
+      type: regex
+      value: "(exec|execSync)\\s*\\([^)]*?\\+"
+      target: file_content
+    - id: child_process_unsanitized
+      description: "child_process with dynamic input"
+      type: regex
+      value: "child_process.*?(req\\.|input|param|args|query)"
+      target: file_content
+      case_sensitive: false
+    - id: python_os_system
+      description: "Python os.system/subprocess with string formatting"
+      type: regex
+      value: "(os\\.system|subprocess\\.(call|run|Popen))\\s*\\(\\s*(f['\"]|['\"].*?%|['\"].*?\\+|['\"].*?\\.format)"
+      target: file_content
+    - id: python_shell_true
+      description: "Python subprocess with shell=True"
+      type: regex
+      value: "subprocess\\.(call|run|Popen)\\s*\\([^)]*shell\\s*=\\s*True"
+      target: file_content
+  condition: any
+report:
+  title: "Command injection risk detected"
+  recommendation: >
+    This code passes unsanitized input to shell commands. An attacker could inject
+    additional commands (e.g., "; rm -rf /") to execute arbitrary operations.
+    Use parameterized commands or input validation.
+false_positives:
+  - "Commands with hardcoded, safe arguments"
+  - "Build scripts that only use controlled input"
+provenance:
+  source: enkrypt_cisco_research
+  first_seen: "2026-03-19"

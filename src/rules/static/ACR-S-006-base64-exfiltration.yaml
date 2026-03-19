@@ -1,0 +1,79 @@
+id: ACR-S-006
+version: "1.0.0"
+title: "Base64 data exfiltration"
+status: active
+created: "2026-03-19"
+author: "AgentCanary Core"
+confidence: high
+severity: critical
+category: data_exfiltration
+subcategory: base64-encoding
+description: >
+  Detects patterns where data is base64-encoded before being transmitted externally.
+  Common in ToxicSkills campaign: credentials are read, encoded, and sent via URL parameter.
+tags:
+  - base64
+  - exfiltration
+  - credential-theft
+  - toxicskills
+mitre:
+  tactics:
+    - exfiltration
+    - collection
+  techniques:
+    - T1132.001
+    - T1041
+applies_to:
+  - mcp_server
+  - skill_file
+  - npm_package
+detection:
+  check_type: static_pattern
+  patterns:
+    - id: base64_in_curl
+      description: "Base64 encoding piped to curl/wget on same line"
+      type: regex
+      value: "(base64|b64encode|btoa).{0,80}(curl|wget)|curl.{0,80}(base64|b64encode)"
+      target: line_content
+      case_sensitive: false
+    - id: base64_in_url_param
+      description: "Base64-encoded data appended to URL query parameter"
+      type: regex
+      value: "\\?[a-zA-Z]+=.{0,30}(base64|btoa|b64encode)"
+      target: file_content
+      case_sensitive: false
+    - id: credentials_then_base64
+      description: "Reading credentials/secrets then base64 encoding"
+      type: regex
+      value: "(credentials|password|token|secret|api.key).*?base64|base64.*?(credentials|password|token|secret)"
+      target: file_content
+      case_sensitive: false
+    - id: cat_pipe_base64
+      description: "Shell pattern: cat sensitive file | base64"
+      type: regex
+      value: "cat\\s+[~./].*?\\|\\s*base64"
+      target: file_content
+    - id: base64_decode_pipe_exec
+      description: "Base64 decode piped to shell execution (echo ... | base64 -D | bash)"
+      type: regex
+      value: "base64\\s+(-d|-D|--decode)\\s*\\|\\s*(bash|sh|zsh|eval|exec|python)"
+      target: file_content
+      case_sensitive: false
+    - id: echo_base64_decode
+      description: "Echo base64 string then decode and execute"
+      type: regex
+      value: "echo\\s+['\"][A-Za-z0-9+/=]{20,}['\"]\\s*\\|\\s*base64"
+      target: file_content
+  condition: any
+report:
+  title: "Base64 data exfiltration pattern detected"
+  recommendation: >
+    This code encodes data with base64 before sending it externally — a classic
+    credential theft technique. Legitimate tools rarely need to base64-encode
+    and transmit environment data. Do not install.
+false_positives:
+  - "Legitimate base64 encoding for API authentication headers"
+  - "Image/file encoding for upload APIs"
+provenance:
+  source: snyk_toxicskills_research
+  first_seen: "2026-03-19"

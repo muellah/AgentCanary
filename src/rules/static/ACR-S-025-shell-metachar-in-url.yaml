@@ -1,0 +1,72 @@
+id: ACR-S-025
+version: "1.0.0"
+title: "Shell metacharacters in URL/endpoint strings"
+status: active
+created: "2026-03-19"
+author: "AgentCanary Core"
+confidence: high
+severity: critical
+category: prompt_injection
+subcategory: shell-metachar-injection
+description: >
+  Detects shell metacharacters embedded in URL strings, endpoints, or
+  authorization URLs. CVE-2025-6514 exploited this by placing $(calc.exe)
+  in an authorization_endpoint URL that was passed to the OS shell via
+  the 'open' package. Also covers backtick and semicolon injection in URLs.
+tags:
+  - shell-injection
+  - url-injection
+  - cve-2025-6514
+  - mcp-remote
+mitre:
+  tactics:
+    - execution
+  techniques:
+    - T1059
+applies_to:
+  - mcp_server
+  - skill_file
+  - npm_package
+  - config_file
+detection:
+  check_type: static_pattern
+  patterns:
+    - id: dollar_paren_in_url_string
+      description: "Command substitution $() inside a quoted URL string"
+      type: regex
+      value: "['\"]https?://[^'\"]*\\$\\([^)]+\\)[^'\"]*['\"]"
+      target: file_content
+    - id: backtick_cmd_in_url_string
+      description: "Backtick command in a quoted URL string"
+      type: regex
+      value: "['\"]https?://[^'\"]*`[^`]+`[^'\"]*['\"]"
+      target: file_content
+    - id: semicolon_in_url
+      description: "Semicolon command chaining in URL string"
+      type: regex
+      value: "(url|endpoint|redirect).*?['\"][^'\"]*;\\s*(rm|curl|wget|bash|sh|cmd|powershell|calc)"
+      target: file_content
+      case_sensitive: false
+    - id: pipe_in_url
+      description: "Pipe operator in URL string"
+      type: regex
+      value: "(url|endpoint|redirect).*?['\"][^'\"]*\\|\\s*(bash|sh|cmd|nc|netcat)"
+      target: file_content
+      case_sensitive: false
+  condition: any
+report:
+  title: "CRITICAL: Shell metacharacters in URL — possible RCE"
+  recommendation: >
+    This code contains shell metacharacters ($(), backticks, semicolons, pipes)
+    inside URL or endpoint strings. This is the exact pattern used in CVE-2025-6514
+    (mcp-remote RCE) where a malicious authorization_endpoint URL was passed to the
+    OS shell. Never pass untrusted URLs to shell commands or the 'open' package.
+false_positives:
+  - "Documentation showing the CVE as an example"
+  - "Security test cases demonstrating the vulnerability"
+provenance:
+  source: cve_2025_6514
+  first_seen: "2025-12-01"
+  references:
+    - url: "https://github.com/Cyberency/CVE-2025-6514"
+      description: "mcp-remote RCE exploit PoC"

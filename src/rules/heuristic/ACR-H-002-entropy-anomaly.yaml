@@ -1,0 +1,53 @@
+id: ACR-H-002
+version: "1.0.0"
+title: "High entropy content anomaly"
+status: active
+created: "2026-03-19"
+author: "AgentCanary Core"
+confidence: medium
+severity: medium
+category: obfuscation
+subcategory: entropy-anomaly
+description: >
+  Detects files with unusually high Shannon entropy, indicating obfuscated,
+  packed, or encrypted content. Legitimate code typically has entropy between
+  3.5-5.0. Values above 5.5 for non-binary text files suggest hidden content,
+  base64 blobs, or packed malware.
+tags:
+  - obfuscation
+  - entropy
+  - packed-code
+  - evasion
+mitre:
+  tactics:
+    - defense-evasion
+  techniques:
+    - T1027
+applies_to:
+  - mcp_server
+  - npm_package
+detection:
+  check_type: heuristic
+  heuristic_checks:
+    - id: high_entropy_file
+      description: "File content Shannon entropy exceeds 6.0 — likely obfuscated"
+      check: entropy_score
+      threshold: 6.0
+    - id: very_long_lines
+      description: "Lines exceeding 3000 chars in source code suggest packed/obfuscated content"
+      check: line_length_max
+      threshold: 3000
+  condition: all
+report:
+  title: "High entropy content detected — possible obfuscation"
+  recommendation: >
+    This file has unusually high information density (entropy), which often indicates
+    obfuscated, packed, or encrypted content. While minified JavaScript is common,
+    obfuscated code in agent skills is suspicious and should be reviewed manually.
+false_positives:
+  - "Minified production JavaScript (e.g., bundled dependencies)"
+  - "Binary data embedded as base64 (e.g., icons, images)"
+  - "Compressed/encoded configuration data"
+provenance:
+  source: cisco_vigil_research
+  first_seen: "2026-03-19"

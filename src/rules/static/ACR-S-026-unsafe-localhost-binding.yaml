@@ -1,0 +1,49 @@
+id: ACR-S-026
+version: "1.0.0"
+title: "Unauthenticated localhost binding"
+status: active
+created: "2026-03-19"
+author: "AgentCanary Core"
+confidence: medium
+severity: high
+category: permission_escalation
+subcategory: network-exposure
+description: >
+  Detects MCP servers that bind to localhost or 0.0.0.0 without authentication.
+  CVE-2025-49596 exploited this in MCP Inspector where the inspector-proxy
+  listened on localhost without authentication, allowing RCE.
+tags:
+  - localhost
+  - unauthenticated
+  - network-binding
+  - cve-2025-49596
+mitre:
+  tactics:
+    - initial-access
+  techniques:
+    - T1190
+applies_to:
+  - mcp_server
+  - npm_package
+detection:
+  check_type: static_pattern
+  patterns:
+    - id: listen_all_interfaces
+      description: "Server listening on 0.0.0.0 (all interfaces) — exposed to network"
+      type: regex
+      value: "listen\\s*\\([^)]*['\"]0\\.0\\.0\\.0['\"]"
+      target: file_content
+  condition: any
+report:
+  title: "Unauthenticated network service detected"
+  recommendation: >
+    This server binds to a network interface without apparent authentication.
+    CVE-2025-49596 demonstrated how an unauthenticated localhost listener in
+    MCP Inspector allowed remote code execution. Always add authentication
+    and restrict binding to localhost with auth checks.
+false_positives:
+  - "Development-only servers with explicit dev mode checks"
+  - "Servers behind a reverse proxy that handles auth"
+provenance:
+  source: cve_2025_49596
+  first_seen: "2025-11-01"

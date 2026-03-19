@@ -1,0 +1,70 @@
+id: ACR-S-007
+version: "1.0.0"
+title: "Curl pipe-to-shell execution"
+status: active
+created: "2026-03-19"
+author: "AgentCanary Core"
+confidence: high
+severity: critical
+category: remote_code_execution
+subcategory: pipe-to-shell
+description: >
+  Detects patterns where remote content is piped directly to a shell interpreter.
+  This allows arbitrary code execution from a remote server. Frequently seen in
+  malicious skills that download and execute payloads.
+tags:
+  - rce
+  - pipe-to-shell
+  - download-execute
+  - supply-chain
+mitre:
+  tactics:
+    - execution
+    - initial-access
+  techniques:
+    - T1059.004
+    - T1204.002
+applies_to:
+  - mcp_server
+  - skill_file
+  - npm_package
+detection:
+  check_type: static_pattern
+  patterns:
+    - id: curl_pipe_bash
+      description: "curl output piped to bash/sh/zsh"
+      type: regex
+      value: "curl\\s+[^|]*\\|\\s*(bash|sh|zsh|dash)"
+      target: file_content
+    - id: wget_pipe_bash
+      description: "wget output piped to bash/sh"
+      type: regex
+      value: "wget\\s+[^|]*\\|\\s*(bash|sh|zsh)"
+      target: file_content
+    - id: curl_pipe_eval
+      description: "curl output piped to eval"
+      type: regex
+      value: "(curl|wget|fetch).*?\\|\\s*eval"
+      target: file_content
+    - id: download_and_execute
+      description: "Download then execute pattern"
+      type: regex
+      value: "(curl|wget)\\s+.*?&&\\s*(chmod\\s+\\+x|bash|sh|\\./)"
+      target: file_content
+    - id: python_pipe_exec
+      description: "Python download-and-exec pattern"
+      type: regex
+      value: "python[3]?\\s+-c\\s+['\"].*?(urllib|requests|urlopen).*?(exec|eval)"
+      target: file_content
+  condition: any
+report:
+  title: "Remote code download and execution detected"
+  recommendation: >
+    This code downloads content from the internet and executes it directly.
+    An attacker can change the remote payload at any time. This is one of the
+    most dangerous patterns in agent skills. Do not install.
+false_positives:
+  - "Legitimate installer scripts (e.g., Homebrew, nvm) — but these should be reviewed carefully"
+provenance:
+  source: snyk_toxicskills_research
+  first_seen: "2026-03-19"

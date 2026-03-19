@@ -1,0 +1,38 @@
+{
+  "legitimate": [
+    {"name": "modelcontextprotocol/typescript-sdk", "stars": 45000, "note": "Official MCP SDK"},
+    {"name": "modelcontextprotocol/python-sdk", "stars": 20000, "note": "Official MCP Python SDK"},
+    {"name": "modelcontextprotocol/inspector", "stars": 9108, "note": "Official MCP Inspector"},
+    {"name": "microsoft/playwright-mcp", "stars": 29230, "note": "Microsoft Playwright MCP"},
+    {"name": "github/github-mcp-server", "stars": 28045, "note": "GitHub official MCP server"},
+    {"name": "ChromeDevTools/chrome-devtools-mcp", "stars": 30139, "note": "Chrome DevTools MCP"},
+    {"name": "PrefectHQ/fastmcp", "stars": 23795, "note": "FastMCP framework"},
+    {"name": "GLips/Figma-Context-MCP", "stars": 13778, "note": "Figma MCP server"},
+    {"name": "tadata-org/fastapi_mcp", "stars": 11661, "note": "FastAPI MCP integration"},
+    {"name": "awslabs/mcp", "stars": 8480, "note": "AWS MCP servers"},
+    {"name": "idosal/git-mcp", "stars": 7793, "note": "Git MCP server"},
+    {"name": "mcp-use/mcp-use", "stars": 9455, "note": "MCP Use framework"},
+    {"name": "lastmile-ai/mcp-agent", "stars": 8109, "note": "MCP Agent"},
+    {"name": "AgentDeskAI/browser-tools-mcp", "stars": 7129, "note": "Browser tools MCP"},
+    {"name": "grab/cursor-talk-to-figma-mcp", "stars": 6505, "note": "Figma Cursor MCP"},
+    {"name": "microsoft/mcp-for-beginners", "stars": 15465, "note": "MCP tutorial"},
+    {"name": "BeehiveInnovations/pal-mcp-server", "stars": 11277, "note": "Pal MCP server"},
+    {"name": "hangwin/mcp-chrome", "stars": 10824, "note": "Chrome MCP"},
+    {"name": "LaurieWired/GhidraMCP", "stars": 7960, "note": "Ghidra reverse engineering MCP"},
+    {"name": "CoplayDev/unity-mcp", "stars": 7261, "note": "Unity game engine MCP"}
+  ],
+  "malicious": [
+    {"name": "aztr0nutzs/NET_NiNjA.v1.2", "type": "skill", "note": "ToxicSkills - clawhub, whatsapp-mgv, coding-agent-1gx, google-qx4"},
+    {"name": "appsecco/vulnerable-mcp-servers-lab", "type": "mcp", "note": "Intentionally vulnerable MCP - eval(), path traversal"},
+    {"name": "YassWorks/Malicious-MCP-Server", "type": "mcp", "note": "Data exfiltration to Shadow Analytics endpoint"},
+    {"name": "harishsg993010/damn-vulnerable-MCP-server", "type": "mcp", "note": "Arbitrary code execution via vulnerable tools"},
+    {"name": "smart-mcp-proxy/malicious-demo-mcp-server", "type": "mcp", "note": "Prompt injection, tool hijacking, data exfil"},
+    {"name": "Cyberency/CVE-2025-6514", "type": "mcp", "note": "mcp-remote RCE exploit PoC"}
+  ],
+  "malicious_samples_local": [
+    {"path": "research/malicious-samples/raw/clawhub-SKILL.md", "type": "skill", "note": "ToxicSkills clawhub - base64 bash + password ZIP"},
+    {"path": "research/malicious-samples/raw/coding-agent-1gx-SKILL.md", "type": "skill", "note": "ToxicSkills coding-agent - rentry.co stager"},
+    {"path": "research/malicious-samples/raw/google-qx4-SKILL.md", "type": "skill", "note": "ToxicSkills google-qx4"},
+    {"path": "research/malicious-samples/raw/whatsapp-mgv-SKILL.md", "type": "skill", "note": "ToxicSkills whatsapp-mgv"}
+  ]
+}

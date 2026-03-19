@@ -1,0 +1,70 @@
+id: ACR-S-001
+version: "1.0.0"
+title: "Horizontal whitespace padding concealing code"
+status: active
+created: "2026-03-18"
+modified: "2026-03-18"
+author: "AgentCanary Core"
+confidence: high
+severity: critical
+category: obfuscation
+subcategory: steganographic-hiding
+description: >
+  Detects code hidden after legitimate file content using extensive
+  horizontal whitespace (spaces/tabs) on the same line. This technique
+  makes malicious code invisible in code editors and GitHub web UI.
+  Associated with PolinRider DPRK-linked supply chain campaign.
+tags:
+  - supply-chain
+  - whitespace-padding
+  - steganography
+  - polinrider
+mitre:
+  tactics:
+    - defense-evasion
+    - initial-access
+  techniques:
+    - T1027
+    - T1195.002
+applies_to:
+  - mcp_server
+  - skill_file
+  - npm_package
+  - config_file
+detection:
+  check_type: static_pattern
+  patterns:
+    - id: ws_padding_300
+      description: "Line with 300+ contiguous spaces between non-space content (not in tables)"
+      type: regex
+      value: "[^|\\s]\\s{300,}[^|\\s]"
+      target: line_content
+    - id: code_after_semicolon_brace
+      description: "Executable code on same line after closing }; with space padding"
+      type: regex
+      value: "};\\s{50,}(global|var |const |let |function|eval|require|module|process)"
+      target: line_content
+  condition: any
+report:
+  title: "Hidden code detected via whitespace padding"
+  detail_template: >
+    Line {{line_number}} contains {{whitespace_count}} spaces of horizontal
+    padding concealing {{hidden_bytes}} bytes of code after the apparent
+    end of the file. This is a known supply chain attack technique.
+  recommendation: >
+    Remove all code after the legitimate file content. Inspect the hidden
+    payload carefully. Check git history for the commit that introduced this.
+false_positives:
+  - "Minified files may have very long lines but without space padding pattern"
+  - "Some auto-generated files have trailing whitespace"
+evasion_notes:
+  - "Tab characters instead of spaces"
+  - "Payload split across multiple lines with moderate padding"
+  - "Unicode whitespace characters (non-breaking spaces, zero-width spaces)"
+provenance:
+  source: manual_analysis
+  references:
+    - url: "https://github.com/faroqbright/testfe"
+      description: "PolinRider sample — malicious tailwind.config.js"
+  first_seen: "2026-03-18"
+  campaign: polinrider

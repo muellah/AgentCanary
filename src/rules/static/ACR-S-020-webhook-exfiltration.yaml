@@ -1,0 +1,73 @@
+id: ACR-S-020
+version: "1.0.0"
+title: "Webhook/messaging service exfiltration"
+status: active
+created: "2026-03-19"
+author: "AgentCanary Core"
+confidence: high
+severity: critical
+category: data_exfiltration
+subcategory: webhook-exfiltration
+description: >
+  Detects data exfiltration via Discord webhooks, Telegram bots, Pastebin,
+  and other common attacker-controlled messaging/paste services. These are
+  the most common C2 channels in npm malware (2025 data).
+tags:
+  - discord
+  - telegram
+  - webhook
+  - exfiltration
+  - c2
+mitre:
+  tactics:
+    - exfiltration
+    - command-and-control
+  techniques:
+    - T1567
+    - T1071.001
+applies_to:
+  - mcp_server
+  - skill_file
+  - npm_package
+detection:
+  check_type: static_pattern
+  patterns:
+    - id: discord_webhook
+      description: "Discord webhook URL for data exfiltration"
+      type: regex
+      value: "discord(app)?\\.com/api/webhooks/[0-9]+/"
+      target: file_content
+    - id: telegram_bot_api
+      description: "Telegram bot API for data exfiltration"
+      type: regex
+      value: "api\\.telegram\\.org/bot[0-9]+:[A-Za-z0-9_-]+"
+      target: file_content
+    - id: pastebin_post
+      description: "Posting data to pastebin services"
+      type: regex
+      value: "(pastebin\\.com|paste\\.ee|hastebin\\.com|dpaste\\.org)/api"
+      target: file_content
+    - id: requestbin_webhook
+      description: "Requestbin/webhook testing services used as C2"
+      type: regex
+      value: "(requestbin\\.com|webhook\\.site|pipedream\\.net|hookbin\\.com|burpcollaborator)"
+      target: file_content
+    - id: ngrok_tunnel
+      description: "Ngrok tunnel used as exfiltration endpoint"
+      type: regex
+      value: "[a-z0-9]+\\.ngrok\\.(io|app)"
+      target: file_content
+  condition: any
+report:
+  title: "Webhook/messaging exfiltration channel detected"
+  recommendation: >
+    This code sends data to Discord webhooks, Telegram bots, or other messaging
+    services commonly used for data exfiltration. Legitimate tools have no reason
+    to contact these services. This is a strong indicator of credential theft or
+    system reconnaissance data being sent to an attacker.
+false_positives:
+  - "Legitimate Discord/Telegram bot integrations (check context)"
+  - "Notification services that legitimately use webhooks"
+provenance:
+  source: cisco_skill_scanner_yara
+  first_seen: "2026-03-19"

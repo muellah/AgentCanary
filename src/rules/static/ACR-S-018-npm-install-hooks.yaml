@@ -1,0 +1,72 @@
+id: ACR-S-018
+version: "1.0.0"
+title: "Suspicious npm install script hooks"
+status: active
+created: "2026-03-19"
+author: "AgentCanary Core"
+confidence: high
+severity: critical
+category: supply_chain
+subcategory: install-hooks
+description: >
+  Detects suspicious preinstall/postinstall scripts in package.json that execute
+  code during npm install. 48.58% of npm malware uses install hooks as the attack
+  vector. Legitimate packages rarely need install hooks beyond native module compilation.
+tags:
+  - npm
+  - install-hook
+  - preinstall
+  - postinstall
+  - supply-chain
+mitre:
+  tactics:
+    - execution
+    - persistence
+  techniques:
+    - T1059.004
+    - T1546
+applies_to:
+  - npm_package
+  - config_file
+detection:
+  check_type: static_pattern
+  patterns:
+    - id: preinstall_script
+      description: "preinstall script with suspicious commands"
+      type: regex
+      value: "\"preinstall\"\\s*:\\s*\"[^\"]*?(curl|wget|node\\s+-e|eval|exec|bash|sh\\s+-c|python|powershell)"
+      target: file_content
+      case_sensitive: false
+    - id: postinstall_script
+      description: "postinstall script with suspicious commands"
+      type: regex
+      value: "\"postinstall\"\\s*:\\s*\"[^\"]*?(curl|wget|node\\s+-e|eval|exec|bash|sh\\s+-c|python|powershell)"
+      target: file_content
+      case_sensitive: false
+    - id: install_script_network
+      description: "install script making network requests"
+      type: regex
+      value: "\"(pre|post)?install\"\\s*:\\s*\"[^\"]*?(https?://|fetch|request|axios)"
+      target: file_content
+      case_sensitive: false
+    - id: install_script_obfuscated
+      description: "install script with obfuscated content"
+      type: regex
+      value: "\"(pre|post)?install\"\\s*:\\s*\"[^\"]*?(\\\\x[0-9a-f]{2}|atob|btoa|Buffer\\.from|fromCharCode)"
+      target: file_content
+      case_sensitive: false
+  condition: any
+report:
+  title: "Suspicious npm install hook detected"
+  recommendation: >
+    This package has preinstall/postinstall scripts that execute suspicious commands.
+    Nearly half of all npm malware uses install hooks as the attack vector. Review the
+    scripts section of package.json carefully. Consider using --ignore-scripts flag
+    when installing.
+false_positives:
+  - "Native module compilation (node-gyp rebuild)"
+  - "Husky git hooks setup"
+  - "Prisma schema generation"
+provenance:
+  source: opensourcemalware_research
+  first_seen: "2026-03-19"

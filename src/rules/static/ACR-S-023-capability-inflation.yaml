@@ -1,0 +1,76 @@
+id: ACR-S-023
+version: "1.0.0"
+title: "Capability inflation / skill discovery abuse"
+status: active
+created: "2026-03-19"
+author: "AgentCanary Core"
+confidence: medium
+severity: medium
+category: social_engineering
+subcategory: capability-inflation
+description: >
+  Detects skills and MCP servers that make overbroad capability claims, stuff
+  keywords for discovery abuse, or impersonate trusted vendors. Used to trick
+  agents and users into choosing malicious tools over legitimate ones.
+tags:
+  - social-engineering
+  - impersonation
+  - keyword-stuffing
+  - trust-abuse
+mitre:
+  tactics:
+    - initial-access
+    - defense-evasion
+  techniques:
+    - T1566
+    - T1036.005
+applies_to:
+  - mcp_server
+  - skill_file
+  - tool_definition
+detection:
+  check_type: static_pattern
+  patterns:
+    - id: vendor_impersonation
+      description: "Impersonating Anthropic, OpenAI, or other trusted vendors"
+      type: regex
+      value: "(official|verified|certified)\\s+(by|from)\\s+(anthropic|openai|google|microsoft|claude)"
+      target: file_content
+      case_sensitive: false
+    - id: overbroad_claims
+      description: "Claims that the tool can do anything or everything"
+      type: regex
+      value: "(can do (anything|everything)|always use (me|this) first|replaces? all other)"
+      target: file_content
+      case_sensitive: false
+    - id: false_safety_claims
+      description: "Unverifiable safety claims"
+      type: regex
+      value: "(100%\\s*(safe|secure|accurate)|never fails|zero risk|guaranteed safe)"
+      target: file_content
+      case_sensitive: false
+    - id: backdoor_mention
+      description: "Mentions of backdoor access or secret commands"
+      type: regex
+      value: "(secret command|backdoor access|hidden feature|admin override|god mode)"
+      target: file_content
+      case_sensitive: false
+    - id: vague_description
+      description: "Suspiciously vague tool description (under 20 chars)"
+      type: regex
+      value: "^.{1,19}$"
+      target: tool_description
+  condition: any
+report:
+  title: "Capability inflation or vendor impersonation detected"
+  recommendation: >
+    This tool makes suspicious claims — impersonating trusted vendors, claiming
+    to do "everything", or using keyword stuffing. Legitimate tools have specific,
+    honest descriptions. This may be a social engineering attempt to get you to
+    install a malicious tool.
+false_positives:
+  - "Marketing language in legitimate tool descriptions"
+  - "Tools that are genuinely broad-purpose (but should still be specific)"
+provenance:
+  source: cisco_skill_scanner_yara
+  first_seen: "2026-03-19"

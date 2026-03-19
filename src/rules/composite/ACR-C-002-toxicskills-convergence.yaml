@@ -1,0 +1,58 @@
+id: ACR-C-002
+version: "1.0.0"
+title: "ToxicSkills convergence pattern"
+status: active
+created: "2026-03-19"
+author: "AgentCanary Core"
+confidence: high
+severity: critical
+category: campaign
+subcategory: toxicskills
+description: >
+  Detects the ToxicSkills convergence pattern where BOTH malicious code AND prompt
+  injection are present in the same skill. Snyk research found that 100% of
+  confirmed malicious skills contained code exploits and 91% also used prompt
+  injection. This combination bypasses both AI safety and traditional code scanning.
+tags:
+  - campaign
+  - toxicskills
+  - convergence
+  - multi-vector
+mitre:
+  tactics:
+    - initial-access
+    - execution
+    - exfiltration
+  techniques:
+    - T1195.002
+    - T1059
+    - T1041
+applies_to:
+  - skill_file
+  - mcp_server
+detection:
+  check_type: composite
+  composite_rules:
+    - ACR-M-001  # Prompt injection in tool description
+    - ACR-M-002  # Skill manipulation
+  patterns:
+    - id: code_exploit_indicator
+      description: "Any code-level exploit pattern (exfil, RCE, credential theft)"
+      type: regex
+      value: "(eval\\s*\\(|exec\\s*\\(|curl.*\\|.*bash|process\\.env.*fetch|base64.*curl|pickle\\.load)"
+      target: file_content
+  condition: count(2)
+report:
+  title: "CRITICAL: ToxicSkills convergence — code exploit + prompt injection"
+  recommendation: >
+    This skill combines BOTH malicious code patterns AND prompt injection techniques.
+    This is the ToxicSkills convergence pattern — the most dangerous class of malicious
+    skills. The prompt injection disables AI safety guards while the code exploits
+    steal data or execute payloads. Do NOT install under any circumstances. Report
+    to the skill marketplace.
+false_positives: []
+provenance:
+  source: snyk_toxicskills_research
+  first_seen: "2026-03-19"
+  references:
+    - "https://snyk.io/blog/toxicskills-malicious-ai-agent-skills-clawhub/"

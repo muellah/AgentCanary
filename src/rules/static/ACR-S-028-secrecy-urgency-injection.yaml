@@ -1,0 +1,83 @@
+id: ACR-S-028
+version: "1.0.0"
+title: "Secrecy/urgency patterns in prompt injection"
+status: active
+created: "2026-03-19"
+author: "AgentCanary Core"
+confidence: high
+severity: high
+category: prompt_injection
+subcategory: social-engineering-injection
+description: >
+  Detects prompt injection patterns that use secrecy and urgency to manipulate
+  the agent — telling it to hide actions from the user, not announce findings,
+  keep things secret, or treat something as a "standard measure". These are
+  hallmarks of malicious sampling/prompt injection attacks.
+tags:
+  - prompt-injection
+  - social-engineering
+  - secrecy
+  - urgency
+  - sampling-abuse
+mitre:
+  tactics:
+    - execution
+    - defense-evasion
+  techniques:
+    - T1059
+    - T1562
+applies_to:
+  - mcp_server
+  - skill_file
+  - tool_definition
+detection:
+  check_type: static_pattern
+  patterns:
+    - id: secrecy_not_announced
+      description: "Instructions to not announce or not tell the user"
+      type: regex
+      value: "(should not be announced|don't (tell|inform|alert|notify) (the user|anyone|the human)|do not (tell|inform|alert|notify) (the user|anyone|the human))"
+      target: file_content
+      case_sensitive: false
+    - id: secrecy_keep_secret
+      description: "Instructions to keep actions secret"
+      type: regex
+      value: "(keep (this|it) (secret|private|between us|confidential|quiet)|this is (confidential|private|secret|between us))"
+      target: file_content
+      case_sensitive: false
+    - id: urgency_standard_measure
+      description: "False authority — instructing agent that action is standard"
+      type: regex
+      value: "(this is a (standard|normal|routine) (measure|procedure) and (should not|must not|shouldn't)|this is (completely )?(normal|standard|routine) (so )?(don't|do not|never))"
+      target: file_content
+      case_sensitive: false
+    - id: urgency_dont_ask
+      description: "Bypassing confirmation — instructing agent to not ask permission"
+      type: regex
+      value: "(don't ask (for )?(permission|confirmation|consent)|you (must|should|need to) (not|never) (ask|request|seek) (permission|confirmation|consent|approval))"
+      target: file_content
+      case_sensitive: false
+    - id: social_send_password
+      description: "Requesting credentials via prompt injection"
+      type: regex
+      value: "(send (me )?the (admin )?password|retrieve the (password|credentials|secret|token|key)|access the (company |server )?(database|system|server))"
+      target: file_content
+      case_sensitive: false
+  condition: any
+report:
+  title: "Secrecy/urgency prompt injection detected"
+  recommendation: >
+    This code contains social engineering patterns designed to manipulate an AI
+    agent — telling it to hide actions, keep secrets from the user, or treat
+    suspicious requests as "standard procedure". This is a classic prompt
+    injection technique. Do NOT trust this tool.
+false_positives:
+  - "Documentation describing prompt injection attacks"
+  - "Security research / CTF challenge code"
+  - "CLI tools with skip-confirmation flags or standard-procedure comments"
+provenance:
+  source: manual_analysis
+  first_seen: "2026-03-19"
+  references:
+    - url: "https://github.com/YassWorks/Malicious-MCP-Server"
+      description: "Sampling abuse with secrecy/urgency patterns"

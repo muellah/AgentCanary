@@ -1,0 +1,58 @@
+id: ACR-S-022
+version: "1.0.0"
+title: "Hidden files with executable code"
+status: active
+created: "2026-03-19"
+author: "AgentCanary Core"
+confidence: medium
+severity: high
+category: supply_chain
+subcategory: hidden-files
+description: >
+  Detects hidden (dot-prefixed) files that contain executable code. Legitimate
+  packages rarely include hidden executable files. Attackers use this to hide
+  malicious scripts from casual directory listing.
+tags:
+  - hidden-files
+  - dotfiles
+  - supply-chain
+mitre:
+  tactics:
+    - defense-evasion
+    - persistence
+  techniques:
+    - T1564.001
+applies_to:
+  - skill_file
+  - npm_package
+detection:
+  check_type: static_pattern
+  patterns:
+    - id: hidden_script_file
+      description: "Hidden file with executable extension"
+      type: regex
+      value: "^\\.[a-zA-Z0-9_-]+\\.(py|js|ts|sh|bash|rb|pl|php|exe|bat|cmd|ps1|vbs)$"
+      target: filename
+    - id: hidden_binary
+      description: "Hidden binary/compiled file"
+      type: regex
+      value: "^\\.[a-zA-Z0-9_-]+\\.(so|dll|dylib|elf|bin|com)$"
+      target: filename
+    - id: glob_targeting_hidden
+      description: "Code specifically targeting hidden files"
+      type: regex
+      value: "glob.*\\.\\*|find.*-name\\s+\"?\\.\\*"
+      target: file_content
+  condition: any
+report:
+  title: "Hidden executable file detected in package"
+  recommendation: >
+    This package contains hidden (dot-prefixed) files with executable code.
+    Legitimate packages should not need hidden executables. Review the hidden
+    files carefully before installing.
+false_positives:
+  - ".eslintrc.js, .prettierrc.js and similar config files"
+  - ".github/scripts/ directory contents"
+provenance:
+  source: cisco_skill_scanner_yaml
+  first_seen: "2026-03-19"
