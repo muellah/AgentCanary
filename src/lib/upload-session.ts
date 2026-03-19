@@ -23,6 +23,9 @@ export interface UploadSession {
 const sessions = new Map<string, UploadSession>();
 
 export function createSession(filename: string, format: string): UploadSession {
+  // Opportunistically clean up stale sessions on each creation
+  cleanupStaleSessionsSync();
+
   const id = `upload-${Date.now()}-${randomBytes(4).toString("hex")}`;
   const dir = mkdtempSync(join(tmpdir(), SESSION_PREFIX));
   const session: UploadSession = {

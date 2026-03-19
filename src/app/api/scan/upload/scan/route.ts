@@ -21,6 +21,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate session ID format (defense-in-depth)
+    if (!/^upload-\d+-[a-f0-9]{8}$/.test(sessionId)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid sessionId format" },
+        { status: 400 }
+      );
+    }
+
     const session = getSession(sessionId);
     if (!session) {
       return NextResponse.json(

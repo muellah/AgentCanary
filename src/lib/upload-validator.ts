@@ -254,16 +254,12 @@ export function validateSingleFile(
     && checks.encoding === "pass"
     && checks.skillContent === "pass";
 
-  if (!success && !checks) {
-    return { ...base, format, checks, error: "File does not appear to be a valid skill/tool/config" };
-  }
-
   return {
     ...base,
     success,
     format,
     checks,
-    ...(!success ? { error: "File does not appear to be a valid skill/tool/config" } : {}),
+    ...(!success ? { error: "This doesn't appear to be a skill file, plugin bundle, or tool definition. AgentCanary scans agent-related files only." } : {}),
   };
 }
 
@@ -360,9 +356,7 @@ function buildFileTree(files: string[]): { path: string; label: string; isDir?: 
 
   // Add directory entries first
   for (const d of Array.from(dirs).sort()) {
-    const label = d.startsWith("skills/") || d.startsWith("skills" + path.sep)
-      ? d
-      : d;
+    const label = d;
     tree.push({ path: d, label, isDir: true });
   }
 
@@ -451,8 +445,8 @@ export async function validateZipBuffer(
     const unixMode = (externalAttr >> 16) & 0xFFFF;
     const isSymlink = (unixMode & 0xF000) === 0xA000;
     if (isSymlink) {
-      checks.pathTraversal = "fail";
-      return { ...base, checks, error: `Symlink detected: ${entryName}` };
+      // Spec: "Skip symlink entries" — silently ignore, don't reject
+      continue;
     }
   }
 
@@ -493,7 +487,6 @@ export async function validateZipBuffer(
   base.fileTree = buildFileTree(walkedFiles);
 
   // Check skill markers
-  const allPaths = extractedPaths.join("\n");
   const hasSkillContent = SKILL_MARKERS.some(marker =>
     extractedPaths.some(p => p.includes(marker) || path.basename(p) === marker)
   );
@@ -518,12 +511,22 @@ export async function validateZipBuffer(
 
   const success = checks.zipBomb === "pass"
     && checks.pathTraversal === "pass"
+    && checks.binaryContent === "pass"
     && checks.skillContent === "pass";
+
+  const errorMsg = !success
+    ? (checks.skillContent === "fail"
+      ? "This doesn't appear to be a skill file, plugin bundle, or tool definition. AgentCanary scans agent-related files only."
+      : checks.binaryContent === "fail"
+        ? "Binary content detected in archive entries"
+        : undefined)
+    : undefined;
 
   return {
     ...base,
     success,
     format: success ? "zip_plugin" : "unknown",
     checks,
+    ...(errorMsg ? { error: errorMsg } : {}),
   };
 }
