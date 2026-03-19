@@ -6,6 +6,8 @@ import {
   BLOCKED_MIMES,
   isAcceptedExtension,
   getMaxSize,
+  isBinaryContent,
+  isValidUtf8,
 } from "@/lib/upload-validator";
 
 describe("Client-side validation constants", () => {
@@ -50,5 +52,42 @@ describe("Client-side validation constants", () => {
     expect(BLOCKED_MIMES.has("application/x-mach-binary")).toBe(true);
     expect(BLOCKED_MIMES.has("application/x-dosexec")).toBe(true);
     expect(BLOCKED_MIMES.has("application/x-msdownload")).toBe(true);
+  });
+});
+
+describe("Layer 3: Content safety", () => {
+  it("detects ELF binary magic bytes", () => {
+    const elfHeader = Buffer.from([0x7f, 0x45, 0x4c, 0x46, 0x00, 0x00]);
+    expect(isBinaryContent(elfHeader)).toBe(true);
+  });
+
+  it("detects PE/MZ executable magic bytes", () => {
+    const peHeader = Buffer.from([0x4d, 0x5a, 0x90, 0x00]);
+    expect(isBinaryContent(peHeader)).toBe(true);
+  });
+
+  it("detects Mach-O binary magic bytes", () => {
+    const machoHeader = Buffer.from([0xcf, 0xfa, 0xed, 0xfe]);
+    expect(isBinaryContent(machoHeader)).toBe(true);
+  });
+
+  it("detects PDF magic bytes", () => {
+    const pdfHeader = Buffer.from("%PDF-1.4 fake content");
+    expect(isBinaryContent(pdfHeader)).toBe(true);
+  });
+
+  it("passes normal UTF-8 text", () => {
+    const text = Buffer.from("# My SKILL\n\nDo something useful.");
+    expect(isBinaryContent(text)).toBe(false);
+  });
+
+  it("validates UTF-8 encoding", () => {
+    const validUtf8 = Buffer.from("Hello world 🌍");
+    expect(isValidUtf8(validUtf8)).toBe(true);
+  });
+
+  it("rejects invalid UTF-8 bytes", () => {
+    const invalidUtf8 = Buffer.from([0x80, 0x81, 0x82, 0xff, 0xfe]);
+    expect(isValidUtf8(invalidUtf8)).toBe(false);
   });
 });
