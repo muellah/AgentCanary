@@ -423,7 +423,7 @@ export default function HomePage() {
 
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 1) {
-      setUploadError("Please drop a single file.");
+      setUploadError("Please upload one file at a time.");
       return;
     }
     if (files.length === 1) {
