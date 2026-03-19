@@ -173,6 +173,36 @@ export async function scanDirectory(dirPath: string): Promise<OrchestratorResult
   return buildAggregateResult(results, rulesLoaded, files.length, startMs);
 }
 
+/**
+ * Scan files from an upload session (single file or extracted zip).
+ * Uses walkDirectory to find all scannable files in the session dir.
+ */
+export async function scanUploadedFile(
+  sessionDir: string,
+  format: string
+): Promise<OrchestratorResult> {
+  const startMs = Date.now();
+  const enableSemantic = format !== "zip_plugin";
+  const { engine, rulesLoaded } = createEngine(enableSemantic);
+
+  const files = walkDirectory(sessionDir);
+  const results: ScanResult[] = [];
+
+  for (const file of files) {
+    if (file.isDocFile && file.type !== "skill_file") continue;
+
+    const target: ScanTarget = {
+      content: file.content,
+      filename: file.relativePath,
+      type: file.type,
+    };
+    const result = await engine.scan(target);
+    results.push(result);
+  }
+
+  return buildAggregateResult(results, rulesLoaded, files.length, startMs);
+}
+
 // ---- Private helpers ----
 
 function buildAggregateResult(
