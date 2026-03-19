@@ -1,0 +1,90 @@
+id: ACR-S-019
+version: "1.0.0"
+title: "Reverse shell patterns"
+status: active
+created: "2026-03-19"
+author: "AgentCanary Core"
+confidence: high
+severity: critical
+category: data_exfiltration
+subcategory: reverse-shell
+description: >
+  Detects reverse shell patterns that establish an outbound connection allowing
+  remote command execution. Covers bash, netcat, socat, python, and perl variants.
+tags:
+  - reverse-shell
+  - rce
+  - backdoor
+  - network
+mitre:
+  tactics:
+    - execution
+    - command-and-control
+  techniques:
+    - T1059
+    - T1071
+applies_to:
+  - mcp_server
+  - skill_file
+  - npm_package
+detection:
+  check_type: static_pattern
+  patterns:
+    - id: bash_reverse_shell
+      description: "Bash TCP reverse shell"
+      type: regex
+      value: "bash\\s+-i\\s+>&\\s*/dev/tcp/"
+      target: file_content
+    - id: netcat_reverse_shell
+      description: "Netcat reverse shell variants"
+      type: regex
+      value: "(nc|ncat|netcat)\\s+(-e|--exec)\\s*/bin/(ba)?sh"
+      target: file_content
+    - id: socat_reverse_shell
+      description: "Socat reverse shell"
+      type: regex
+      value: "socat\\s+.*exec.*sh"
+      target: file_content
+      case_sensitive: false
+    - id: python_reverse_shell
+      description: "Python reverse shell via socket"
+      type: regex
+      value: "socket\\.connect.*subprocess|subprocess.*socket\\.connect|os\\.dup2.*socket"
+      target: file_content
+    - id: perl_reverse_shell
+      description: "Perl reverse shell"
+      type: regex
+      value: "perl\\s+-e\\s+.*socket.*INET"
+      target: file_content
+    - id: mkfifo_reverse_shell
+      description: "Named pipe (mkfifo) reverse shell"
+      type: regex
+      value: "mkfifo\\s+.*\\|.*nc\\s+"
+      target: file_content
+    - id: netcat_connect_simple
+      description: "Netcat connection to host:port (C2 callback)"
+      type: regex
+      value: "\\bnc\\s+[A-Za-z0-9_.-]+\\s+\\d{2,5}\\b"
+      target: file_content
+    - id: powershell_reverse_shell
+      description: "PowerShell reverse shell"
+      type: regex
+      value: "New-Object\\s+System\\.Net\\.Sockets\\.TCPClient"
+      target: file_content
+      case_sensitive: false
+  condition: any
+report:
+  title: "CRITICAL: Reverse shell pattern detected"
+  recommendation: >
+    This code contains a reverse shell pattern — it establishes an outbound network
+    connection that gives an attacker remote command execution on your machine. This
+    is almost certainly malicious. Do NOT install.
+false_positives:
+  - "Security testing tools or CTF challenges"
+  - "Documentation showing reverse shell examples"
+provenance:
+  source: cisco_skill_scanner_yara
+  first_seen: "2026-03-19"
+  references:
+    - url: "https://github.com/cisco-ai-defense/skill-scanner"
+      description: "command_injection_generic.yara"

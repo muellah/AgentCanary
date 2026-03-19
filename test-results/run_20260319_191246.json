@@ -1,0 +1,163 @@
+{
+  "timestamp": "20260319_191246",
+  "legitimate": [
+    {
+      "repo": "modelcontextprotocol/typescript-sdk",
+      "verdict": "SAFE",
+      "score": 100,
+      "findings": 0,
+      "filesScanned": 200,
+      "pass": true
+    },
+    {
+      "repo": "modelcontextprotocol/python-sdk",
+      "verdict": "ERROR",
+      "pass": false
+    },
+    {
+      "repo": "modelcontextprotocol/inspector",
+      "verdict": "ERROR",
+      "pass": false
+    },
+    {
+      "repo": "microsoft/playwright-mcp",
+      "verdict": "ERROR",
+      "pass": false
+    },
+    {
+      "repo": "github/github-mcp-server",
+      "verdict": "ERROR",
+      "pass": false
+    },
+    {
+      "repo": "ChromeDevTools/chrome-devtools-mcp",
+      "verdict": "ERROR",
+      "pass": false
+    },
+    {
+      "repo": "PrefectHQ/fastmcp",
+      "verdict": "SAFE",
+      "score": 100,
+      "findings": 0,
+      "filesScanned": 200,
+      "pass": true
+    },
+    {
+      "repo": "GLips/Figma-Context-MCP",
+      "verdict": "ERROR",
+      "pass": false
+    },
+    {
+      "repo": "tadata-org/fastapi_mcp",
+      "verdict": "SAFE",
+      "score": 100,
+      "findings": 0,
+      "filesScanned": 44,
+      "pass": true
+    },
+    {
+      "repo": "awslabs/mcp",
+      "verdict": "SAFE",
+      "score": 100,
+      "findings": 0,
+      "filesScanned": 200,
+      "pass": true
+    },
+    {
+      "repo": "idosal/git-mcp",
+      "verdict": "ERROR",
+      "pass": false
+    },
+    {
+      "repo": "mcp-use/mcp-use",
+      "verdict": "ERROR",
+      "pass": false
+    },
+    {
+      "repo": "lastmile-ai/mcp-agent",
+      "verdict": "SAFE",
+      "score": 100,
+      "findings": 0,
+      "filesScanned": 200,
+      "pass": true
+    },
+    {
+      "repo": "AgentDeskAI/browser-tools-mcp",
+      "verdict": "ERROR",
+      "pass": false
+    },
+    {
+      "repo": "grab/cursor-talk-to-figma-mcp",
+      "verdict": "SAFE",
+      "score": 100,
+      "findings": 0,
+      "filesScanned": 17,
+      "pass": true
+    },
+    {
+      "repo": "microsoft/mcp-for-beginners",
+      "verdict": "SAFE",
+      "score": 100,
+      "findings": 0,
+      "filesScanned": 0,
+      "pass": true
+    },
+    {
+      "repo": "BeehiveInnovations/pal-mcp-server",
+      "verdict": "ERROR",
+      "pass": false
+    },
+    {
+      "repo": "hangwin/mcp-chrome",
+      "verdict": "ERROR",
+      "pass": false
+    },
+    {
+      "repo": "LaurieWired/GhidraMCP",
+      "verdict": "SAFE",
+      "score": 100,
+      "findings": 0,
+      "filesScanned": 2,
+      "pass": true
+    },
+    {
+      "repo": "CoplayDev/unity-mcp",
+      "verdict": "ERROR",
+      "pass": false
+    }
+  ],
+  "malicious_repos": [
+    {
+      "repo": "appsecco/vulnerable-mcp-servers-lab",
+      "verdict": "ERROR",
+      "pass": false
+    },
+    {
+      "repo": "YassWorks/Malicious-MCP-Server",
+      "verdict": "ERROR",
+      "pass": false
+    },
+    {
+      "repo": "harishsg993010/damn-vulnerable-MCP-server",
+      "verdict": "ERROR",
+      "pass": false
+    },
+    {
+      "repo": "smart-mcp-proxy/malicious-demo-mcp-server",
+      "verdict": "ERROR",
+      "pass": false
+    },
+    {
+      "repo": "Cyberency/CVE-2025-6514",
+      "verdict": "ERROR",
+      "pass": false
+    },
+    {
+      "repo": "aztr0nutzs/NET_NiNjA.v1.2",
+      "verdict": "ERROR",
+      "pass": false
+    }
+  ],
+  "malicious_files": [],
+  "summary": {}
+}

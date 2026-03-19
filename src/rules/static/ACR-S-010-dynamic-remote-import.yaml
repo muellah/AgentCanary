@@ -1,0 +1,78 @@
+id: ACR-S-010
+version: "1.0.0"
+title: "Dynamic import or remote code loading"
+status: active
+created: "2026-03-19"
+author: "AgentCanary Core"
+confidence: high
+severity: critical
+category: remote_code_execution
+subcategory: dynamic-import
+description: >
+  Detects dynamic import() or require() calls loading code from remote URLs.
+  This allows runtime code injection — the remote server controls what executes.
+  Also detects remote instruction loading patterns where agent behavior is
+  controlled by external URLs at runtime.
+tags:
+  - rce
+  - dynamic-import
+  - remote-loading
+  - supply-chain
+mitre:
+  tactics:
+    - execution
+    - command-and-control
+  techniques:
+    - T1059
+    - T1105
+applies_to:
+  - mcp_server
+  - skill_file
+  - npm_package
+detection:
+  check_type: static_pattern
+  patterns:
+    - id: dynamic_import_url
+      description: "Dynamic import() with HTTP URL"
+      type: regex
+      value: "import\\s*\\([^)]*https?://"
+      target: file_content
+    - id: require_url
+      description: "require() with HTTP URL"
+      type: regex
+      value: "require\\s*\\([^)]*https?://"
+      target: file_content
+    - id: eval_fetch
+      description: "Fetched content passed to eval"
+      type: regex
+      value: "eval\\s*\\(\\s*(await\\s+)?fetch"
+      target: file_content
+    - id: function_constructor_http
+      description: "Function constructor with fetched code"
+      type: regex
+      value: "new\\s+Function\\s*\\([^)]*fetch|new\\s+Function\\s*\\([^)]*http"
+      target: file_content
+    - id: python_exec_urllib
+      description: "Python exec() with urllib/requests content"
+      type: regex
+      value: "exec\\s*\\(\\s*(urllib|requests|urlopen)"
+      target: file_content
+    - id: remote_instruction_loading
+      description: "Loading instructions/prompts from remote URL"
+      type: regex
+      value: "(instructions|system_prompt|rules)\\s*=\\s*(await\\s+)?fetch\\s*\\("
+      target: file_content
+      case_sensitive: false
+  condition: any
+report:
+  title: "Remote code/instruction loading detected"
+  recommendation: >
+    This code loads and executes content from remote URLs at runtime. The remote
+    server can change the payload at any time, making the skill behavior unpredictable
+    and potentially malicious. This is a critical supply chain risk. Do not install.
+false_positives:
+  - "Legitimate CDN imports for well-known libraries"
+  - "Plugin systems with allowlisted sources"
+provenance:
+  source: snyk_cisco_research
+  first_seen: "2026-03-19"

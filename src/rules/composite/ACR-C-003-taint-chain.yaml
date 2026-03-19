@@ -1,0 +1,66 @@
+id: ACR-C-003
+version: "1.0.0"
+title: "Pipeline taint chain — data read + transform + exfiltrate"
+status: active
+created: "2026-03-19"
+author: "AgentCanary Core"
+confidence: high
+severity: critical
+category: data_exfiltration
+subcategory: taint-chain
+description: >
+  Detects multi-step exfiltration chains where sensitive data is read, optionally
+  transformed/obfuscated, then sent over the network. Inspired by Cisco's pipeline
+  taint tracking system. The combination of credential access + encoding + network
+  send is the classic exfiltration chain.
+tags:
+  - taint-chain
+  - pipeline
+  - multi-step
+  - exfiltration
+mitre:
+  tactics:
+    - collection
+    - exfiltration
+  techniques:
+    - T1560
+    - T1041
+applies_to:
+  - mcp_server
+  - skill_file
+  - npm_package
+detection:
+  check_type: composite
+  composite_rules:
+    - ACR-S-021  # Credential file access
+    - ACR-S-006  # Base64 exfiltration
+    - ACR-S-005  # Suspicious network
+    - ACR-S-020  # Webhook exfiltration
+  patterns:
+    - id: read_encode_send
+      description: "Read sensitive data, encode, send in one expression"
+      type: regex
+      value: "(cat|read|open|fs\\.read).*?(base64|encode|btoa).*?(curl|wget|fetch|post|request)"
+      target: file_content
+      case_sensitive: false
+    - id: env_to_network
+      description: "Environment variable directly sent to network"
+      type: regex
+      value: "(process\\.env|os\\.environ|\\$[A-Z_]+).*?(fetch|curl|wget|request|post|send)"
+      target: file_content
+      case_sensitive: false
+  condition: count(2)
+report:
+  title: "CRITICAL: Multi-step exfiltration chain detected"
+  recommendation: >
+    This code reads sensitive data (credentials, environment variables), transforms
+    or encodes it, then sends it over the network. This is the classic data
+    exfiltration pipeline. Multiple detection rules triggered together confirm
+    this is intentional credential theft, not coincidental pattern matches.
+false_positives: []
+provenance:
+  source: cisco_pipeline_analyzer
+  first_seen: "2026-03-19"
+  references:
+    - url: "https://github.com/cisco-ai-defense/skill-scanner"
+      description: "pipeline_analyzer.py taint tracking system"

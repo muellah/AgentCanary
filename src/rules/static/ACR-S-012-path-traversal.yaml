@@ -1,0 +1,61 @@
+id: ACR-S-012
+version: "1.0.0"
+title: "Path traversal patterns"
+status: active
+created: "2026-03-19"
+author: "AgentCanary Core"
+confidence: medium
+severity: high
+category: unauthorized_access
+subcategory: path-traversal
+description: >
+  Detects patterns that could enable path traversal attacks, allowing access to
+  files outside intended directories. Common in MCP servers that handle file
+  operations without proper path sanitization.
+tags:
+  - path-traversal
+  - directory-traversal
+  - file-access
+mitre:
+  tactics:
+    - collection
+    - credential-access
+  techniques:
+    - T1005
+applies_to:
+  - mcp_server
+  - skill_file
+  - npm_package
+detection:
+  check_type: static_pattern
+  patterns:
+    - id: user_input_in_path
+      description: "User/request input used in file path operations"
+      type: regex
+      value: "(readFile|writeFile|readdir|readFileSync|createReadStream)\\s*\\([^)]*?(req\\.|input|param|args|query|user)"
+      target: file_content
+      case_sensitive: false
+    - id: path_join_unsanitized
+      description: "path.join with external input without validation"
+      type: regex
+      value: "path\\.(join|resolve)\\s*\\([^)]*?(req\\.|input|param|args|query|user)"
+      target: file_content
+      case_sensitive: false
+    - id: traversal_in_string_concat
+      description: "Path traversal in string concatenation or template literal"
+      type: regex
+      value: "(\\+|\\$\\{)[^\\n]*?\\.\\./\\.\\./\\.\\./"
+      target: file_content
+  condition: any
+report:
+  title: "Path traversal risk detected"
+  recommendation: >
+    This code accesses file system paths using external input without apparent
+    sanitization. An attacker could use path traversal (../) to read or write
+    files outside the intended directory. Review file access patterns carefully.
+false_positives:
+  - "File managers that intentionally allow broad file access"
+  - "Configuration readers with hardcoded safe paths"
+provenance:
+  source: enkrypt_cisco_research
+  first_seen: "2026-03-19"

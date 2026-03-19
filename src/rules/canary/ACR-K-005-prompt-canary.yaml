@@ -1,0 +1,65 @@
+id: ACR-K-005
+version: "1.0.0"
+title: "Prompt injection detected via canary token"
+status: active
+created: "2026-03-19"
+modified: "2026-03-19"
+author: "AgentCanary Core"
+confidence: high
+severity: critical
+category: prompt_injection
+subcategory: canary-detection
+description: >
+  Detects prompt injection attacks using canary tokens embedded in content.
+  Supports two detection modes: (1) Leak mode — a hidden canary token
+  embedded as an HTML comment appears in the tool's output, indicating
+  the prompt/content was leaked or echoed. (2) Hijack mode — an instructed
+  canary token is missing from output, indicating the tool's goal was
+  hijacked by injected instructions that overrode the original task.
+tags:
+  - canary
+  - prompt-injection
+  - leak-detection
+  - hijack-detection
+  - llm-security
+mitre:
+  tactics:
+    - initial-access
+    - execution
+  techniques:
+    - T1059
+    - T1190
+applies_to:
+  - mcp_server
+  - skill_file
+  - tool_definition
+detection:
+  check_type: heuristic
+  heuristic_checks:
+    - id: prompt_canary_leak
+      description: "Hidden canary token appeared in output — prompt was leaked"
+      check: prompt_canary_leak
+      threshold: 0
+    - id: prompt_canary_hijack
+      description: "Instructed canary token missing from output — goal was hijacked"
+      check: prompt_canary_hijack
+      threshold: 0
+  condition: any
+report:
+  title: "Prompt injection detected via canary"
+  recommendation: >
+    A canary token test detected prompt injection behavior. In leak mode,
+    the tool exposed hidden content it should not have revealed. In hijack
+    mode, the tool failed to follow its intended instructions, suggesting
+    injected content overrode the original goal. Do not trust this tool
+    with sensitive prompts or instructions.
+false_positives:
+  - "Tools that intentionally echo or reflect all input content"
+  - "Hijack mode may false-positive if the tool legitimately ignores formatting instructions"
+evasion_notes:
+  - "Attacker could strip HTML comments before processing"
+  - "Partial token reproduction may evade exact-match detection"
+  - "Token could be paraphrased rather than echoed verbatim"
+provenance:
+  source: manual_analysis
+  first_seen: "2026-03-19"

@@ -1,0 +1,74 @@
+id: ACR-C-001
+version: "1.0.0"
+title: "PolinRider supply chain campaign"
+status: active
+created: "2026-03-18"
+author: "AgentCanary Core"
+confidence: high
+severity: critical
+category: supply_chain
+subcategory: compromised-contributor
+description: >
+  Composite detection for the PolinRider DPRK-linked supply chain attack
+  campaign. Combines whitespace padding detection, JavaScript obfuscation
+  fingerprinting, and file size anomaly checks. Triggers campaign-level
+  alert when multiple indicators match.
+tags:
+  - polinrider
+  - dprk
+  - supply-chain
+  - campaign
+mitre:
+  tactics:
+    - initial-access
+    - defense-evasion
+    - credential-access
+  techniques:
+    - T1195.002
+    - T1027
+    - T1552.001
+applies_to:
+  - npm_package
+  - config_file
+detection:
+  check_type: composite
+  composite_rules:
+    - ACR-S-001
+    - ACR-S-002
+    - ACR-H-001
+  condition: "count(2)"
+  patterns:
+    - id: polinrider_signature
+      description: "PolinRider-specific obfuscation signature string"
+      type: string
+      value: "rmcej%otb%"
+      target: file_content
+      case_sensitive: true
+    - id: polinrider_marker
+      description: "PolinRider global marker assignment"
+      type: string
+      value: "global['!']"
+      target: file_content
+report:
+  title: "PolinRider supply chain campaign detected"
+  detail_template: >
+    CAMPAIGN ALERT: PolinRider (DPRK-linked). Matched {{match_count}}
+    of {{total_rules}} campaign indicators. Sub-rule matches:
+    {{matched_rules}}. This is a known state-sponsored supply chain
+    attack targeting credential theft and crypto wallet exfiltration.
+  recommendation: >
+    CRITICAL: Remove this package immediately. Do not execute any code.
+    Audit all systems that may have run this code for credential compromise.
+    Rotate all API keys and tokens that may have been exposed.
+    Report to npm security if this is a public package.
+false_positives: []
+evasion_notes:
+  - "New PolinRider variants may change signature strings"
+  - "Campaign may adopt new obfuscation techniques"
+provenance:
+  source: manual_analysis
+  references:
+    - url: "https://github.com/faroqbright/testfe"
+      description: "PolinRider sample repository"
+  first_seen: "2026-03-18"
+  campaign: polinrider

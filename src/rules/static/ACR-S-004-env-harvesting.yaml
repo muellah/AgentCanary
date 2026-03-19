@@ -1,0 +1,61 @@
+id: ACR-S-004
+version: "1.0.0"
+title: "Environment variable harvesting"
+status: active
+created: "2026-03-18"
+author: "AgentCanary Core"
+confidence: high
+severity: critical
+category: data_exfiltration
+subcategory: env-variable-harvesting
+description: >
+  Detects patterns that read environment variables (API keys, tokens, secrets)
+  and transmit them externally. Common in supply chain attacks for credential theft.
+tags:
+  - credential-theft
+  - env-vars
+  - exfiltration
+mitre:
+  tactics:
+    - credential-access
+    - exfiltration
+  techniques:
+    - T1552.001
+    - T1041
+applies_to:
+  - mcp_server
+  - npm_package
+detection:
+  check_type: static_pattern
+  patterns:
+    - id: process_env_in_fetch
+      description: "process.env used within fetch/http request"
+      type: regex
+      value: "fetch\\s*\\([^)]*process\\.env"
+      target: file_content
+    - id: env_in_url_template
+      description: "Environment variable interpolated into URL string"
+      type: regex
+      value: "\\$\\{process\\.env\\.\\w+\\}.*https?://"
+      target: file_content
+    - id: bulk_env_access
+      description: "Accessing entire process.env object (not a single var)"
+      type: regex
+      value: "(JSON\\.stringify|Object\\.keys|Object\\.entries)\\s*\\(\\s*process\\.env\\s*\\)"
+      target: file_content
+    - id: env_post_body
+      description: "Environment variables sent in POST request body"
+      type: regex
+      value: "body.*process\\.env|process\\.env.*body"
+      target: file_content
+  condition: any
+report:
+  title: "Environment variable harvesting detected"
+  recommendation: >
+    This code reads environment variables and appears to transmit them externally.
+    This is a critical credential theft pattern. Do not install.
+false_positives:
+  - "Legitimate config loaders that read specific env vars for local use"
+provenance:
+  source: manual_analysis
+  first_seen: "2026-03-18"

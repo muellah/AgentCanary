@@ -1,0 +1,73 @@
+id: ACR-S-017
+version: "1.0.0"
+title: "Unicode steganography / invisible text"
+status: active
+created: "2026-03-19"
+author: "AgentCanary Core"
+confidence: high
+severity: critical
+category: obfuscation
+subcategory: unicode-steganography
+description: >
+  Detects Unicode steganography techniques used to hide malicious instructions
+  in tool descriptions and skill files. Includes zero-width characters, RTL/LTR
+  overrides, Unicode Tag block (U+E00xx), and Variation Selectors Supplement.
+  The os-info-checker-es6 attack (2025) pioneered Variation Selector smuggling.
+tags:
+  - unicode
+  - steganography
+  - zero-width
+  - invisible-text
+  - os-info-checker
+mitre:
+  tactics:
+    - defense-evasion
+    - execution
+  techniques:
+    - T1027
+    - T1036
+applies_to:
+  - mcp_server
+  - skill_file
+  - npm_package
+  - tool_definition
+detection:
+  check_type: static_pattern
+  patterns:
+    - id: zero_width_chars_high_count
+      description: "High density of zero-width characters (U+200B/C/D, U+FEFF) — 10+ in sequence"
+      type: regex
+      value: "(?:[\\u200B\\u200C\\u200D\\uFEFF].*?){10,}"
+      target: file_content
+    - id: rtl_ltr_override_with_context
+      description: "RTL/LTR override characters near code-like content"
+      type: regex
+      value: "[\\u202D\\u202E][\\s\\S]{0,50}(function|eval|exec|import|require|curl|wget)"
+      target: file_content
+      case_sensitive: false
+    - id: zero_width_in_identifiers
+      description: "Zero-width characters embedded inside identifiers or strings (smuggling)"
+      type: regex
+      value: "[a-zA-Z][\\u200B\\u200C\\u200D]+[a-zA-Z]"
+      target: file_content
+  condition: any
+report:
+  title: "Unicode steganography detected — invisible malicious content"
+  recommendation: >
+    This file contains invisible Unicode characters that can hide malicious
+    instructions from human review. This technique was used in the os-info-checker-es6
+    attack to smuggle payloads via Variation Selectors. Strip all invisible characters
+    and review the decoded content before installing.
+false_positives:
+  - "Legitimate RTL text in Arabic/Hebrew content"
+  - "Single BOM character (U+FEFF) at file start"
+  - "Emoji variation selectors in documentation"
+evasion_notes:
+  - "Attackers may use Private Use Area characters instead"
+  - "Combining marks can also be used for steganography"
+provenance:
+  source: cisco_skill_scanner_yara
+  first_seen: "2025-06-15"
+  references:
+    - url: "https://github.com/cisco-ai-defense/skill-scanner"
+      description: "prompt_injection_unicode_steganography.yara"

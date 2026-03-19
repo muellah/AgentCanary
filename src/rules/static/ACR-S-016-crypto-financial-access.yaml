@@ -1,0 +1,71 @@
+id: ACR-S-016
+version: "1.0.0"
+title: "Cryptocurrency and financial access patterns"
+status: active
+created: "2026-03-19"
+author: "AgentCanary Core"
+confidence: medium
+severity: medium
+category: financial_risk
+subcategory: crypto-access
+description: >
+  Detects patterns related to cryptocurrency wallet access, private key handling,
+  or financial account operations. The Aslaep123 threat actor used crypto/trading
+  bait skills to steal wallet credentials. Skills requesting access to financial
+  operations should be treated with extreme caution.
+tags:
+  - crypto
+  - financial
+  - wallet
+  - credential-theft
+mitre:
+  tactics:
+    - credential-access
+    - collection
+  techniques:
+    - T1552
+applies_to:
+  - mcp_server
+  - skill_file
+  - npm_package
+detection:
+  check_type: static_pattern
+  patterns:
+    - id: private_key_access
+      description: "Cryptocurrency private key or seed phrase handling"
+      type: regex
+      value: "(seed[_-]?phrase|mnemonic|keystore|wallet[_-]?key)\\s*[:=]"
+      target: file_content
+      case_sensitive: false
+    - id: wallet_operations
+      description: "Wallet connection or signing operations"
+      type: regex
+      value: "(eth_sign|eth_sendTransaction|signTransaction|web3\\.eth\\.sign|solana.*signTransaction)"
+      target: file_content
+      case_sensitive: false
+    - id: metamask_phantom
+      description: "Browser wallet interaction (MetaMask, Phantom)"
+      type: regex
+      value: "(window\\.ethereum|window\\.solana|metamask|phantom\\.connect)"
+      target: file_content
+      case_sensitive: false
+    - id: crypto_transfer
+      description: "Cryptocurrency transfer operations"
+      type: regex
+      value: "(sendTransaction|transferFrom|approve\\(|swap.*token)"
+      target: file_content
+      case_sensitive: false
+  condition: any
+report:
+  title: "Cryptocurrency/financial access detected"
+  recommendation: >
+    This skill accesses cryptocurrency wallets or financial operations. While some
+    skills legitimately interact with crypto, this is also a common attack vector
+    for credential theft. Verify the skill author's reputation and review the code
+    carefully before granting any financial access.
+false_positives:
+  - "Legitimate DeFi/trading tools from verified publishers"
+  - "Cryptocurrency portfolio trackers"
+provenance:
+  source: snyk_toxicskills_aslaep123
+  first_seen: "2026-03-19"

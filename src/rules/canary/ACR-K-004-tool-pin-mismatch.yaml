@@ -1,0 +1,58 @@
+id: ACR-K-004
+version: "1.0.0"
+title: "Tool definition changed since last pin (rug-pull detection)"
+status: active
+created: "2026-03-19"
+modified: "2026-03-19"
+author: "AgentCanary Core"
+confidence: high
+severity: critical
+category: deceptive_behavior
+subcategory: rug-pull
+description: >
+  Detects when an MCP tool's definition (description, schema, parameters)
+  has changed since it was last pinned by AgentCanary. Tool definitions
+  are hashed with SHA-256 at scan time and stored locally. A hash mismatch
+  on re-scan indicates the tool was modified after initial trust was
+  established — a classic rug-pull attack pattern where benign tools
+  silently gain new capabilities or change behavior.
+tags:
+  - canary
+  - rug-pull
+  - tool-pin
+  - supply-chain
+  - trust-violation
+mitre:
+  tactics:
+    - persistence
+    - defense-evasion
+  techniques:
+    - T1195.002
+    - T1036
+applies_to:
+  - mcp_server
+  - tool_definition
+detection:
+  check_type: heuristic
+  heuristic_checks:
+    - id: tool_pin_hash_mismatch
+      description: "SHA-256 hash of tool definition differs from pinned value"
+      check: tool_pin_verify
+      threshold: 0
+  condition: any
+report:
+  title: "Tool definition changed — possible rug-pull"
+  recommendation: >
+    This tool's definition has changed since it was last scanned and pinned.
+    Compare the current definition with the pinned version to understand what
+    changed. Re-pin only if the changes are legitimate and expected. Treat
+    unexpected changes to tool descriptions or schemas as potentially malicious.
+false_positives:
+  - "Legitimate tool updates that change descriptions or add parameters"
+  - "Version upgrades that modify tool schemas"
+evasion_notes:
+  - "Attacker could make very small changes that preserve apparent behavior"
+  - "Tool could return different definitions to different callers"
+provenance:
+  source: manual_analysis
+  first_seen: "2026-03-19"

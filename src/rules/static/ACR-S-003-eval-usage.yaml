@@ -1,0 +1,63 @@
+id: ACR-S-003
+version: "1.0.0"
+title: "Dynamic code execution via eval or Function constructor"
+status: active
+created: "2026-03-18"
+author: "AgentCanary Core"
+confidence: medium
+severity: high
+category: obfuscation
+subcategory: eval-usage
+description: >
+  Detects usage of eval(), new Function(), or similar dynamic code execution
+  patterns that allow arbitrary code to run. In MCP servers and tool code,
+  these are rarely legitimate and often indicate payload delivery mechanisms.
+tags:
+  - eval
+  - dynamic-execution
+  - code-injection
+mitre:
+  tactics:
+    - execution
+    - defense-evasion
+  techniques:
+    - T1059.007
+applies_to:
+  - mcp_server
+  - npm_package
+  - config_file
+detection:
+  check_type: static_pattern
+  patterns:
+    - id: eval_call
+      description: "Direct eval() call"
+      type: regex
+      value: "\\beval\\s*\\("
+      target: file_content
+    - id: function_constructor
+      description: "new Function() to create executable code from string"
+      type: regex
+      value: "new\\s+Function\\s*\\("
+      target: file_content
+    - id: settimeout_string
+      description: "setTimeout/setInterval with string argument (implicit eval)"
+      type: regex
+      value: "set(Timeout|Interval)\\s*\\(\\s*['\"`]"
+      target: file_content
+    - id: indirect_eval
+      description: "Indirect eval via variable assignment"
+      type: regex
+      value: "(\\bwindow|\\bglobal|\\bglobalThis)\\s*\\[\\s*['\"]eval['\"]\\s*\\]"
+      target: file_content
+  condition: any
+report:
+  title: "Dynamic code execution detected"
+  recommendation: >
+    Review the context of eval/Function usage carefully. In MCP servers,
+    legitimate uses are extremely rare. This likely indicates a code injection vector.
+false_positives:
+  - "Template engines that use Function constructor for compilation"
+  - "REPL or playground tools designed to execute user code"
+provenance:
+  source: manual_analysis
+  first_seen: "2026-03-18"

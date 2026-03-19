@@ -1,0 +1,38 @@
+{
+  "timestamp": "20260319_190825",
+  "legitimate": [],
+  "malicious_repos": [
+    {
+      "repo": "appsecco/vulnerable-mcp-servers-lab",
+      "verdict": "ERROR",
+      "pass": false
+    },
+    {
+      "repo": "YassWorks/Malicious-MCP-Server",
+      "verdict": "ERROR",
+      "pass": false
+    },
+    {
+      "repo": "harishsg993010/damn-vulnerable-MCP-server",
+      "verdict": "ERROR",
+      "pass": false
+    },
+    {
+      "repo": "smart-mcp-proxy/malicious-demo-mcp-server",
+      "verdict": "ERROR",
+      "pass": false
+    },
+    {
+      "repo": "Cyberency/CVE-2025-6514",
+      "verdict": "ERROR",
+      "pass": false
+    },
+    {
+      "repo": "aztr0nutzs/NET_NiNjA.v1.2",
+      "verdict": "ERROR",
+      "pass": false
+    }
+  ],
+  "malicious_files": [],
+  "summary": {}
+}

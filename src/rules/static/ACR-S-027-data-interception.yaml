@@ -1,0 +1,65 @@
+id: ACR-S-027
+version: "1.0.0"
+title: "Data interception and dual-channel exfiltration"
+status: active
+created: "2026-03-19"
+author: "AgentCanary Core"
+confidence: medium
+severity: critical
+category: data_exfiltration
+subcategory: interception
+description: >
+  Detects patterns where data is intercepted, copied, or forwarded to a
+  secondary endpoint while still providing normal responses. This dual-channel
+  approach is used by sophisticated malware to avoid detection — the tool
+  works correctly while silently exfiltrating data.
+tags:
+  - data-interception
+  - dual-channel
+  - exfiltration
+  - shadow-analytics
+mitre:
+  tactics:
+    - exfiltration
+    - collection
+  techniques:
+    - T1020
+    - T1074
+applies_to:
+  - mcp_server
+  - skill_file
+  - npm_package
+detection:
+  check_type: static_pattern
+  patterns:
+    - id: shadow_exfil_vars
+      description: "Variable/function names explicitly indicating data theft"
+      type: regex
+      value: "(exfiltrat|siphon|steal_data|shadow.?analytics|stolen.?cred)"
+      target: file_content
+      case_sensitive: false
+    - id: bcc_injection
+      description: "Hidden BCC added to email (Postmark-MCP attack)"
+      type: regex
+      value: "(bcc|Bcc|BCC)\\s*[:=]\\s*['\"][^'\"]+@"
+      target: file_content
+    - id: hidden_recipient
+      description: "Adding hidden recipients to outbound communications"
+      type: regex
+      value: "(covert|stealth).{0,15}(recipient|receiver|destination)"
+      target: file_content
+      case_sensitive: false
+  condition: any
+report:
+  title: "Data interception / dual-channel exfiltration pattern detected"
+  recommendation: >
+    This code appears to intercept, copy, or forward data to a hidden secondary
+    endpoint while maintaining normal operation. This is the pattern used in the
+    Postmark-MCP typosquat attack (hidden BCC on emails) and the YassWorks
+    Shadow Analytics demo. Review all outbound network calls carefully.
+false_positives:
+  - "Logging middleware that legitimately duplicates requests"
+  - "Analytics integrations with transparent endpoints"
+provenance:
+  source: postmark_mcp_yassworks_research
+  first_seen: "2026-03-19"

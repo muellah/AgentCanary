@@ -1,0 +1,81 @@
+id: ACR-S-002
+version: "1.0.0"
+title: "Obfuscated JavaScript payload signatures"
+status: active
+created: "2026-03-18"
+modified: "2026-03-18"
+author: "AgentCanary Core"
+confidence: high
+severity: critical
+category: obfuscation
+subcategory: minification-abuse
+description: >
+  Detects common JavaScript obfuscation patterns used in supply chain attacks.
+  Includes character permutation functions, hex escape sequences, String.fromCharCode
+  encoding, and self-executing anonymous function wrappers typical of malicious payloads.
+tags:
+  - obfuscation
+  - javascript
+  - supply-chain
+mitre:
+  tactics:
+    - defense-evasion
+  techniques:
+    - T1027
+    - T1059.007
+applies_to:
+  - mcp_server
+  - npm_package
+  - config_file
+detection:
+  check_type: static_pattern
+  patterns:
+    - id: fromcharcode_obfuscation
+      description: "String.fromCharCode used to build strings dynamically"
+      type: regex
+      value: "String\\.fromCharCode\\([0-9]{2,3}(,[0-9]{2,3}){3,}"
+      target: file_content
+    - id: hex_escape_sequences
+      description: "Multiple hex escape sequences in string literals"
+      type: regex
+      value: "(\\\\x[0-9a-fA-F]{2}){3,}"
+      target: file_content
+    - id: char_permutation_function
+      description: "Character array shuffling loop typical of JS obfuscators"
+      type: regex
+      value: "var\\s+\\w+=\\w+\\.charAt\\(\\w+\\).*g\\[\\w+\\]=\\s*g\\[\\w+\\]"
+      target: file_content
+    - id: global_bracket_assignment
+      description: "Assigning to global object via bracket notation"
+      type: regex
+      value: "global\\[['\"][^'\"]+['\"]\\]\\s*="
+      target: file_content
+    - id: iife_with_obfuscated_body
+      description: "Self-executing function with heavily obfuscated body"
+      type: regex
+      value: "\\(function\\s*\\(\\)\\s*\\{var\\s+\\w{2,3}=''"
+      target: file_content
+  condition: any
+report:
+  title: "Obfuscated JavaScript payload detected"
+  detail_template: >
+    Found {{match_count}} obfuscation patterns: {{matched_patterns}}.
+    Obfuscated code in config or tool files is a strong indicator of malicious intent.
+  recommendation: >
+    Do not execute this code. Deobfuscate the payload in a sandbox to
+    understand its behavior. Check if the obfuscated code was part of the
+    original project or introduced by a later contributor.
+false_positives:
+  - "Legitimate minified vendor libraries (check if file is in node_modules)"
+  - "Webpack/bundler output files with legitimate obfuscation"
+evasion_notes:
+  - "Custom obfuscation not matching known patterns"
+  - "Splitting obfuscation across multiple files"
+  - "Using template literals instead of String.fromCharCode"
+provenance:
+  source: manual_analysis
+  references:
+    - url: "https://github.com/faroqbright/testfe"
+      description: "PolinRider sample with character permutation obfuscation"
+  first_seen: "2026-03-18"
+  campaign: polinrider

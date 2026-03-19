@@ -1,0 +1,82 @@
+id: ACR-M-005
+version: "1.0.0"
+title: "Intent misalignment — tool behavior vs stated purpose"
+status: active
+created: "2026-03-19"
+author: "AgentCanary Core"
+confidence: medium
+severity: high
+category: deceptive_behavior
+subcategory: intent-misalignment
+description: >
+  Detects MCP tools whose code/behavior doesn't match their stated purpose. For
+  example, a "weather API" tool that requests filesystem access, or a "markdown
+  formatter" that makes network requests. Inspired by OpenAI Guardrails'
+  intent-alignment model (ROC AUC 0.987).
+tags:
+  - intent-misalignment
+  - deceptive
+  - scope-violation
+mitre:
+  tactics:
+    - defense-evasion
+    - collection
+  techniques:
+    - T1036
+applies_to:
+  - mcp_server
+  - skill_file
+  - tool_definition
+detection:
+  check_type: semantic
+  pre_filter_patterns:
+    - "description"
+    - "tool"
+    - "server"
+    - "MCP"
+    - "skill"
+  semantic_check:
+    model: "claude-sonnet"
+    input_field: "file_content"
+    system_prompt: >
+      You are a security analyzer detecting intent misalignment in MCP servers and skills.
+
+      Intent misalignment occurs when a tool's actual code/behavior doesn't match its
+      stated description or name. Analyze the code and description together.
+
+      Red flags:
+      1. Tool claims a narrow purpose but accesses unrelated resources (weather tool reading files)
+      2. Tool description says "read-only" but code writes/deletes
+      3. Tool claims local operation but makes external network requests
+      4. Tool has permissions far beyond its stated scope
+      5. Tool performs actions completely unrelated to its description
+      6. Hidden functionality beyond what's described
+
+      Respond with JSON:
+      {
+        "confidence": 0.0-1.0,
+        "is_misaligned": true/false,
+        "stated_purpose": "what the tool claims to do",
+        "actual_behavior": "what the code actually does",
+        "misalignment_type": "scope-violation|hidden-functionality|permission-mismatch|deceptive-description"
+      }
+
+      Be conservative: some tools legitimately need broad access for their stated purpose.
+      Only flag clear mismatches between description and behavior.
+    threshold: 0.75
+report:
+  title: "Intent misalignment — tool does more than it claims"
+  recommendation: >
+    This tool's actual behavior doesn't match its description. The code accesses
+    resources or performs actions beyond its stated purpose. This is a deception
+    technique where malicious functionality is hidden behind a benign description.
+    Review the code carefully or remove the tool.
+false_positives:
+  - "Multi-purpose tools with broad but legitimate functionality"
+  - "Tools with poor documentation but benign code"
+provenance:
+  source: openai_guardrails_research
+  first_seen: "2026-03-19"
+  references:
+    - url: "https://openai.github.io/openai-guardrails-python/ref/checks/prompt_injection_detection/"
+      description: "OpenAI Guardrails intent-alignment model"

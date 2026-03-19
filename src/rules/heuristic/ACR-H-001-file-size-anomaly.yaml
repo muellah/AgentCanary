@@ -1,0 +1,47 @@
+id: ACR-H-001
+version: "1.0.0"
+title: "File size anomaly for file type"
+status: active
+created: "2026-03-18"
+author: "AgentCanary Core"
+confidence: medium
+severity: medium
+category: obfuscation
+subcategory: steganographic-hiding
+description: >
+  Flags files whose size significantly exceeds the expected range for their
+  file type. A tailwind.config.js at 7KB when typical is 1-2KB, or a SKILL.md
+  at 50KB when typical is 2-5KB, suggests hidden content.
+tags:
+  - anomaly-detection
+  - file-size
+applies_to:
+  - config_file
+  - npm_package
+detection:
+  check_type: heuristic
+  heuristic_checks:
+    - id: config_file_oversize
+      check: file_size_ratio
+      threshold: 8.0
+      description: "Config file more than 8x expected size for its type"
+    - id: line_length_extreme
+      check: line_length_max
+      threshold: 5000
+      description: "Any line exceeding 5000 characters — likely minified/obfuscated"
+report:
+  title: "File size or structure anomaly detected"
+  detail_template: >
+    File {{filename}} ({{file_size}} bytes) exceeds expected size for its type
+    by {{ratio}}x. Maximum line length: {{max_line_length}} chars.
+    Entropy score: {{entropy}}.
+  recommendation: >
+    Inspect the file for hidden content, especially at the end of long lines
+    or after the apparent end of meaningful code.
+false_positives:
+  - "Bundled/compiled output files"
+  - "Files with embedded data (base64 images in CSS, etc.)"
+  - "Auto-generated code with verbose output"
+provenance:
+  source: manual_analysis
+  first_seen: "2026-03-18"

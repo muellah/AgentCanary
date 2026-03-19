@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Edit",
+      "Bash",
+      "WebFetch",
+      "WebSearch",
+      "mcp__MCP_DOCKER__webpage-to-markdown",
+      "mcp__MCP_DOCKER__fetch",
+      "mcp__MCP_DOCKER__fetch_content",
+      "mcp__MCP_DOCKER__bing-search-to-markdown",
+      "mcp__basic-memory__write_note",
+      "mcp__basic-memory__read_content",
+      "mcp__basic-memory__search",
+      "mcp__basic-memory__search_notes",
+      "Skill(planning-with-files)",
+      "Skill(planning-with-files:*)",
+      "mcp__bigquery__get_table_info"
+    ]
+  }
+}

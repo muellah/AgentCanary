@@ -1,0 +1,70 @@
+id: ACR-S-011
+version: "1.0.0"
+title: "Unsafe deserialization"
+status: active
+created: "2026-03-19"
+author: "AgentCanary Core"
+confidence: high
+severity: critical
+category: remote_code_execution
+subcategory: deserialization
+description: >
+  Detects usage of unsafe deserialization functions that can execute arbitrary code
+  when loading untrusted data. Python's pickle, marshal, and yaml.load (without
+  SafeLoader) are common vectors for remote code execution.
+tags:
+  - rce
+  - deserialization
+  - pickle
+  - marshal
+mitre:
+  tactics:
+    - execution
+  techniques:
+    - T1059
+applies_to:
+  - mcp_server
+  - skill_file
+  - npm_package
+detection:
+  check_type: static_pattern
+  patterns:
+    - id: pickle_load
+      description: "Python pickle.load — arbitrary code execution"
+      type: regex
+      value: "pickle\\.(load|loads)\\s*\\("
+      target: file_content
+    - id: marshal_load
+      description: "Python marshal.load — bytecode execution"
+      type: regex
+      value: "marshal\\.(load|loads)\\s*\\("
+      target: file_content
+    - id: yaml_unsafe_load
+      description: "PyYAML unsafe load (without SafeLoader)"
+      type: regex
+      value: "yaml\\.load\\s*\\([^)]*(?!Loader|SafeLoader|BaseLoader)"
+      target: file_content
+    - id: shelve_open
+      description: "Python shelve.open — uses pickle internally"
+      type: regex
+      value: "shelve\\.open\\s*\\("
+      target: file_content
+    - id: js_deserialize
+      description: "node-serialize or serialize-javascript with untrusted input"
+      type: regex
+      value: "(unserialize|deserialize)\\s*\\(.*?(req|input|param|body|query)"
+      target: file_content
+      case_sensitive: false
+  condition: any
+report:
+  title: "Unsafe deserialization detected"
+  recommendation: >
+    This code uses deserialization functions that can execute arbitrary code when
+    processing untrusted data. An attacker can craft malicious serialized data
+    to achieve remote code execution. Use safe alternatives (JSON, SafeLoader).
+false_positives:
+  - "Serialization of trusted, internally-generated data"
+  - "yaml.load with explicit Loader parameter (safe)"
+provenance:
+  source: proximity_cisco_research
+  first_seen: "2026-03-19"
