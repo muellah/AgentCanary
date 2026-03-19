@@ -14,6 +14,7 @@ import {
   isBinaryContent,
   isValidUtf8,
   validateZipBuffer,
+  validateSingleFile,
 } from "@/lib/upload-validator";
 
 function createTestZip(files: Record<string, string>): Buffer {
@@ -171,5 +172,68 @@ describe("Layer 2: Zip safety validation", () => {
     // 10 files is well under 500, so this should not be rejected for entry count
     // The important test is that ZIP_MAX_ENTRIES === 500 (tested above)
     expect(result).toHaveProperty("extractedFiles");
+  });
+});
+
+describe("Single file validation", () => {
+  it("accepts a valid SKILL.md with frontmatter", () => {
+    const content = Buffer.from("---\nname: test-skill\ndescription: A test\n---\n# Test\nDo stuff.");
+    const result = validateSingleFile(content, "SKILL.md");
+    expect(result.success).toBe(true);
+    expect(result.format).toBe("skill_md");
+    expect(result.checks.skillContent).toBe("pass");
+  });
+
+  it("accepts a valid tool definition JSON", () => {
+    const content = Buffer.from(JSON.stringify({
+      tools: [{ name: "test", description: "A tool", inputSchema: {} }],
+    }));
+    const result = validateSingleFile(content, "tools.json");
+    expect(result.success).toBe(true);
+    expect(result.format).toBe("tool_json");
+  });
+
+  it("accepts MCP config YAML", () => {
+    const content = Buffer.from("mcpServers:\n  test:\n    command: node\n");
+    const result = validateSingleFile(content, "mcp.yaml");
+    expect(result.success).toBe(true);
+    expect(result.format).toBe("config_yaml");
+  });
+
+  it("rejects a random .md file without skill content", () => {
+    const content = Buffer.from("# My Recipe\n\nTake 2 cups of flour...");
+    const result = validateSingleFile(content, "recipe.md");
+    expect(result.success).toBe(false);
+    expect(result.checks.skillContent).toBe("fail");
+  });
+
+  it("rejects a binary file disguised as .md", () => {
+    const content = Buffer.from([0x7f, 0x45, 0x4c, 0x46, 0x00, 0x00, 0x00]);
+    const result = validateSingleFile(content, "exploit.md");
+    expect(result.success).toBe(false);
+    expect(result.checks.binaryContent).toBe("fail");
+  });
+
+  it("rejects a file with a blocked MIME type", () => {
+    const content = Buffer.from("not really an exe");
+    const result = validateSingleFile(content, "test.md", "application/x-executable");
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/MIME type blocked/);
+  });
+
+  it("accepts a file with an allowed MIME type", () => {
+    const content = Buffer.from("---\nname: test\ndescription: A test\n---\n# Skill\nDo stuff.");
+    const result = validateSingleFile(content, "test.md", "text/markdown");
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects package.json-like content as non-tool JSON", () => {
+    const content = Buffer.from(JSON.stringify({
+      name: "my-package", version: "1.0.0", description: "A Node.js package",
+      main: "index.js", dependencies: {},
+    }));
+    const result = validateSingleFile(content, "package.json");
+    expect(result.success).toBe(false);
+    expect(result.checks.skillContent).toBe("fail");
   });
 });

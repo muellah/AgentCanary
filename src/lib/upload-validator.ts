@@ -94,6 +94,179 @@ export function isValidUtf8(buf: Buffer): boolean {
   }
 }
 
+// ---- Single file validation (Layer 3 content detection) ----
+
+export interface SingleFileValidationResult {
+  success: boolean;
+  format: "skill_md" | "tool_json" | "config_yaml" | "unknown";
+  filename: string;
+  size: number;
+  checks: {
+    binaryContent: "pass" | "fail";
+    encoding: "pass" | "fail";
+    skillContent: "pass" | "fail";
+    mimeType: "pass" | "fail";
+  };
+  error?: string;
+}
+
+const AGENT_KEYWORDS = [
+  "agent", "skill", "mcp", "tool", "claude", "llm", "prompt",
+  "assistant", "workflow", "automation", "instruction",
+];
+
+function isSkillMarkdown(text: string): boolean {
+  // Check for YAML frontmatter with name and description
+  if (/^---\s*\n/.test(text)) {
+    const frontmatterEnd = text.indexOf("\n---", 4);
+    if (frontmatterEnd !== -1) {
+      const frontmatter = text.slice(0, frontmatterEnd);
+      if (/\bname\s*:/i.test(frontmatter) && /\bdescription\s*:/i.test(frontmatter)) {
+        return true;
+      }
+    }
+  }
+
+  // Check for instructional headers (## Steps, ## Instructions, ## Usage, etc.)
+  if (/^#{1,3}\s+(Steps|Instructions|Usage|How to|Task|Goal|Overview|Description)\b/im.test(text)) {
+    return true;
+  }
+
+  // Check for 2+ agent keywords
+  let keywordCount = 0;
+  const lower = text.toLowerCase();
+  for (const kw of AGENT_KEYWORDS) {
+    if (lower.includes(kw)) {
+      keywordCount++;
+      if (keywordCount >= 2) return true;
+    }
+  }
+
+  return false;
+}
+
+function isToolOrMcpJson(text: string): boolean {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return false;
+  }
+
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return false;
+  const obj = parsed as Record<string, unknown>;
+
+  // Check for mcpServers key
+  if ("mcpServers" in obj) return true;
+
+  // Check for tools array with proper tool definitions
+  if (Array.isArray(obj["tools"])) {
+    const tools = obj["tools"] as unknown[];
+    if (tools.length > 0) {
+      const first = tools[0];
+      if (
+        typeof first === "object" &&
+        first !== null &&
+        "name" in (first as Record<string, unknown>) &&
+        "description" in (first as Record<string, unknown>) &&
+        ("inputSchema" in (first as Record<string, unknown>) || "parameters" in (first as Record<string, unknown>))
+      ) {
+        return true;
+      }
+    }
+  }
+
+  // Reject generic package.json-style objects (has name, version, description but no tool fields)
+  if ("name" in obj && "version" in obj && "description" in obj) {
+    // This looks like package.json
+    return false;
+  }
+
+  return false;
+}
+
+function isMcpYaml(text: string): boolean {
+  // Check for mcpServers, tools, or servers top-level keys
+  return /^(mcpServers|tools|servers)\s*:/m.test(text);
+}
+
+export function validateSingleFile(
+  buf: Buffer,
+  filename: string,
+  mimeType?: string,
+): SingleFileValidationResult {
+  const ext = filename.includes(".") ? filename.slice(filename.lastIndexOf(".")).toLowerCase() : "";
+  const base: Omit<SingleFileValidationResult, "checks"> = {
+    success: false,
+    format: "unknown",
+    filename,
+    size: buf.length,
+  };
+  const checks: SingleFileValidationResult["checks"] = {
+    binaryContent: "pass",
+    encoding: "pass",
+    skillContent: "fail",
+    mimeType: "pass",
+  };
+
+  // MIME type check
+  if (mimeType && BLOCKED_MIMES.has(mimeType)) {
+    checks.mimeType = "fail";
+    return { ...base, checks, error: `MIME type blocked: ${mimeType}` };
+  }
+
+  // Binary content check
+  if (isBinaryContent(buf)) {
+    checks.binaryContent = "fail";
+    return { ...base, checks, error: "Binary content detected" };
+  }
+
+  // UTF-8 encoding check
+  if (!isValidUtf8(buf)) {
+    checks.encoding = "fail";
+    return { ...base, checks, error: "Invalid UTF-8 encoding" };
+  }
+
+  const text = buf.toString("utf-8");
+
+  // Format-specific content detection
+  let format: SingleFileValidationResult["format"] = "unknown";
+
+  if (ext === ".md") {
+    if (isSkillMarkdown(text)) {
+      checks.skillContent = "pass";
+      format = "skill_md";
+    }
+  } else if (ext === ".json") {
+    if (isToolOrMcpJson(text)) {
+      checks.skillContent = "pass";
+      format = "tool_json";
+    }
+  } else if (ext === ".yaml" || ext === ".yml") {
+    if (isMcpYaml(text)) {
+      checks.skillContent = "pass";
+      format = "config_yaml";
+    }
+  }
+
+  const success = checks.mimeType === "pass"
+    && checks.binaryContent === "pass"
+    && checks.encoding === "pass"
+    && checks.skillContent === "pass";
+
+  if (!success && !checks) {
+    return { ...base, format, checks, error: "File does not appear to be a valid skill/tool/config" };
+  }
+
+  return {
+    ...base,
+    success,
+    format,
+    checks,
+    ...(!success ? { error: "File does not appear to be a valid skill/tool/config" } : {}),
+  };
+}
+
 // ---- Layer 2: Zip safety ----
 
 export interface ZipValidationResult {
