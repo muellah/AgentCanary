@@ -83,6 +83,7 @@ export async function fetchQuickMetadata(
       lastPush: String(r.pushed_at || ""),
       openIssues: Number(r.open_issues_count || 0),
       license: license ? (license.spdx_id || license.key || null) as string | null : null,
+      description: r.description ? String(r.description) : null,
     };
   }
 
