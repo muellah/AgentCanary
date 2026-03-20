@@ -13,6 +13,182 @@ import { calculateConfidence } from "@/engine/confidence";
 import { fetchQuickMetadata, fetchDeepMetadata } from "./github-metadata";
 import { extractCodeMetadata } from "./metadata-extractors";
 
+/**
+ * Security tool / scanner detection keywords.
+ * Repos that ARE security tools naturally contain attack patterns —
+ * their findings should be downgraded from "intent" to "capability".
+ */
+const SECURITY_TOOL_SIGNALS = {
+  /** Keywords in package.json name, description, or keywords array */
+  packageKeywords: [
+    "security", "scanner", "audit", "vulnerability", "pentest",
+    "sast", "dast", "fuzzer", "fuzzing", "exploit", "cve",
+    "semgrep", "eslint-plugin-security", "snyk", "mcp-scan",
+    "detection", "threat", "malware", "antivirus",
+  ],
+  /** Keywords in README content (case-insensitive) */
+  readmeKeywords: [
+    "security scanner", "security audit", "vulnerability scanner",
+    "penetration test", "security tool", "threat detection",
+    "malware detection", "sast", "static analysis security",
+    "security research", "exploit demo", "proof of concept",
+    "security assessment", "mcp scanner", "mcp audit",
+    "intentionally vulnerable", "damn vulnerable", "owasp",
+  ],
+  /** GitHub repo description keywords */
+  descriptionKeywords: [
+    "security", "scanner", "audit", "vulnerability", "pentest",
+    "fuzzer", "exploit", "detection", "defense",
+  ],
+  /** Known security tool / trusted organizations whose repos contain attack patterns legitimately */
+  trustedOrgs: [
+    // Security companies
+    "trailofbits", "cisco-ai-defense", "snyk", "antgroup",
+    "apisec-inc", "invariantlabs-ai", "guardrails-ai",
+    // AI platform companies (their skills/plugins contain instructional security content)
+    "anthropics", "modelcontextprotocol", "openai", "google",
+    "microsoft", "aws", "awslabs",
+  ],
+};
+
+/**
+ * Detect whether a repo is itself a security tool, scanner, or audit framework.
+ * Returns a confidence score 0-1 (0 = not a security tool, 1 = definitely is).
+ */
+function detectSecurityToolRepo(
+  files: Array<{ relativePath: string; content: string; isDocFile?: boolean }>,
+  packageJsonContent: string | null,
+  repoDescription?: string | null,
+  repoOwner?: string | null,
+): { isSecurityTool: boolean; confidence: number; reason: string } {
+  let score = 0;
+  const reasons: string[] = [];
+
+  // Check trusted org — strong signal, alone sufficient to cross threshold
+  if (repoOwner && SECURITY_TOOL_SIGNALS.trustedOrgs.includes(repoOwner.toLowerCase())) {
+    score += 0.6;
+    reasons.push(`trusted org: ${repoOwner}`);
+  }
+
+  // Check package.json
+  if (packageJsonContent) {
+    try {
+      const pkg = JSON.parse(packageJsonContent);
+      const searchText = [
+        pkg.name || "",
+        pkg.description || "",
+        ...(Array.isArray(pkg.keywords) ? pkg.keywords : []),
+      ].join(" ").toLowerCase();
+
+      const matchedKeywords = SECURITY_TOOL_SIGNALS.packageKeywords.filter(kw =>
+        searchText.includes(kw)
+      );
+      if (matchedKeywords.length >= 2) {
+        score += 0.4;
+        reasons.push(`package.json keywords: ${matchedKeywords.join(", ")}`);
+      } else if (matchedKeywords.length === 1) {
+        score += 0.2;
+        reasons.push(`package.json keyword: ${matchedKeywords[0]}`);
+      }
+    } catch { /* ignore parse errors */ }
+  }
+
+  // Check repo description from GitHub API
+  // BUT: repos that self-describe as "malicious", "vulnerable", or "exploit demo"
+  // from untrusted orgs should NOT get the security tool pass
+  if (repoDescription) {
+    const descLower = repoDescription.toLowerCase();
+    const isSelfDeclaredMalicious = /malicious|vulnerable|exploit|damn.?vulnerable|honeypot/.test(descLower);
+    const isTrustedOrg = repoOwner && SECURITY_TOOL_SIGNALS.trustedOrgs.includes(repoOwner.toLowerCase());
+
+    if (isSelfDeclaredMalicious && !isTrustedOrg) {
+      // Penalize: this looks like a malicious demo from an unknown author
+      score -= 0.3;
+      reasons.push(`self-declared malicious from untrusted org`);
+    } else {
+      const matchedDesc = SECURITY_TOOL_SIGNALS.descriptionKeywords.filter(kw =>
+        descLower.includes(kw)
+      );
+      if (matchedDesc.length >= 1) {
+        score += 0.3;
+        reasons.push(`repo description: ${matchedDesc.join(", ")}`);
+      }
+    }
+  }
+
+  // Check README
+  const readmeFile = files.find(f =>
+    /^readme\.md$/i.test(f.relativePath) || /^readme$/i.test(f.relativePath)
+  );
+  if (readmeFile) {
+    const readmeLower = readmeFile.content.toLowerCase();
+    const matchedReadme = SECURITY_TOOL_SIGNALS.readmeKeywords.filter(kw =>
+      readmeLower.includes(kw)
+    );
+    if (matchedReadme.length >= 2) {
+      score += 0.4;
+      reasons.push(`README: ${matchedReadme.slice(0, 3).join(", ")}`);
+    } else if (matchedReadme.length === 1) {
+      score += 0.2;
+      reasons.push(`README: ${matchedReadme[0]}`);
+    }
+  }
+
+  // Check for YAML rule files (like our own rules or semgrep rules)
+  const yamlRuleFiles = files.filter(f =>
+    /\.(yaml|yml)$/i.test(f.relativePath) &&
+    (f.content.includes("pattern:") || f.content.includes("rules:") || f.content.includes("severity:"))
+  );
+  if (yamlRuleFiles.length >= 3) {
+    score += 0.3;
+    reasons.push(`${yamlRuleFiles.length} YAML rule files detected`);
+  }
+
+  const confidence = Math.min(score, 1.0);
+  return {
+    isSecurityTool: confidence >= 0.5,
+    confidence,
+    reason: reasons.join("; ") || "no security tool signals",
+  };
+}
+
+/**
+ * Apply security-tool context to scan results.
+ * Downgrades all findings from intent → capability (reduced penalty)
+ * and recalculates per-file scores and verdicts.
+ */
+function applySecurityToolSuppression(results: ScanResult[]): void {
+  const SEVERITY_PENALTY: Record<string, number> = {
+    critical: 40, high: 25, medium: 10, low: 3, info: 0,
+  };
+  const CAPABILITY_FACTOR = 0.4;
+
+  for (const result of results) {
+    if (result.findings.length === 0) continue;
+
+    // Downgrade severity: critical → medium, high → low
+    for (const f of result.findings) {
+      if (f.severity === "critical") f.severity = "medium";
+      else if (f.severity === "high") f.severity = "low";
+    }
+
+    // Disable short-circuit (security tools aren't actually malicious)
+    result.shortCircuit = false;
+
+    // Recalculate score with all findings treated as capability-only
+    const penalty = result.findings.reduce((sum, f) => {
+      return sum + (SEVERITY_PENALTY[f.severity] || 5) * CAPABILITY_FACTOR;
+    }, 0);
+    result.score = Math.max(0, Math.min(100, Math.round(100 - penalty)));
+
+    // Recalculate verdict
+    result.verdict = result.score >= 80 ? "SAFE"
+      : result.score >= 50 ? "CAUTION"
+      : result.score >= 20 ? "SUSPICIOUS"
+      : "DANGEROUS";
+  }
+}
+
 export interface OrchestratorResult {
   success: boolean;
   results: ScanResult[];
@@ -30,6 +206,8 @@ export interface OrchestratorResult {
   metadata?: MetadataSignals;
   /** Human-readable context caveats */
   caveats?: Caveat[];
+  /** True if the repo was detected as a security tool/scanner */
+  isSecurityTool?: boolean;
   error?: string;
 }
 
@@ -140,6 +318,19 @@ export async function scanGitHubRepo(url: string, deepScan = false): Promise<Orc
     // Await GitHub metadata (should be done by now — ran in parallel)
     const githubMeta = await metadataPromise;
 
+    // Detect security tool repos (scanners, audit tools, etc.)
+    // These naturally contain attack patterns and shouldn't be flagged as malicious
+    const secToolDetection = detectSecurityToolRepo(
+      files.map(f => ({ relativePath: f.relativePath, content: f.content, isDocFile: f.isDocFile })),
+      packageJsonContent,
+      githubMeta.repo?.description ?? null,
+      parsed?.owner ?? null,
+    );
+
+    if (secToolDetection.isSecurityTool) {
+      applySecurityToolSuppression(results);
+    }
+
     // Deep scan: fetch additional signals if enabled
     let deepSignals: { contributorCount?: number; topContributorPct?: number; starsPerDay?: number } = {};
     if (deepScan && parsed && githubMeta.repo) {
@@ -158,7 +349,22 @@ export async function scanGitHubRepo(url: string, deepScan = false): Promise<Orc
       deepScan,
     };
 
-    return buildAggregateResult(results, rulesLoaded, files.length, startMs, metadata);
+    const result = buildAggregateResult(results, rulesLoaded, files.length, startMs, metadata);
+
+    // Add security tool context to result
+    if (secToolDetection.isSecurityTool) {
+      result.isSecurityTool = true;
+      result.caveats = [
+        ...(result.caveats || []),
+        {
+          dimension: "repo_type",
+          severity: "info" as const,
+          text: `This repository appears to be a security tool, scanner, or from a trusted publisher (${secToolDetection.reason}). Findings have been downgraded as they likely represent detection patterns, not malicious code.`,
+        },
+      ];
+    }
+
+    return result;
   } finally {
     clone.cleanupFn?.();
   }

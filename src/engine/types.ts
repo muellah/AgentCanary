@@ -245,6 +245,7 @@ export interface MetadataSignals {
     lastPush: string;         // ISO date
     openIssues: number;
     license: string | null;
+    description: string | null;
     contributorCount?: number;       // deep scan only
     topContributorPct?: number;      // deep scan only
     starsPerDay?: number;            // deep scan only
