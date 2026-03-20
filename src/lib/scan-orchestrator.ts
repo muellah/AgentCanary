@@ -7,8 +7,11 @@ import { ScanEngine, isIntentRule } from "@/engine/scanner";
 import type { ScanResult, ScanTarget, Verdict, TargetType, MetadataSignals, Caveat } from "@/engine/types";
 import { loadAllRules } from "./rule-registry";
 import { createSemanticApiCall } from "./claude-api";
-import { cloneRepo } from "./github-fetcher";
+import { cloneRepo, parseGitHubUrl } from "./github-fetcher";
 import { walkDirectory } from "./file-walker";
+import { calculateConfidence } from "@/engine/confidence";
+import { fetchQuickMetadata, fetchDeepMetadata } from "./github-metadata";
+import { extractCodeMetadata } from "./metadata-extractors";
 
 export interface OrchestratorResult {
   success: boolean;
@@ -47,7 +50,7 @@ function createEngine(enableSemantic = false): { engine: ScanEngine; rulesLoaded
 /**
  * Scan a GitHub repository
  */
-export async function scanGitHubRepo(url: string): Promise<OrchestratorResult> {
+export async function scanGitHubRepo(url: string, deepScan = false): Promise<OrchestratorResult> {
   const startMs = Date.now();
   const { engine, rulesLoaded } = createEngine();
 
@@ -68,16 +71,31 @@ export async function scanGitHubRepo(url: string): Promise<OrchestratorResult> {
   }
 
   try {
+    const parsed = parseGitHubUrl(url);
+
+    // Start metadata fetch in parallel with code scan
+    const metadataPromise = parsed
+      ? fetchQuickMetadata(parsed.owner, parsed.repo).catch(() => ({ author: null, repo: null }))
+      : Promise.resolve({ author: null, repo: null });
+
     // Walk the repo files
     const files = walkDirectory(clone.localPath);
     const results: ScanResult[] = [];
 
-    // Scan each file — skip pure documentation, demote test findings
+    // Find package.json for dependency extraction
+    const packageJsonFile = files.find(
+      f => f.relativePath === "package.json" || f.relativePath.endsWith("/package.json")
+    );
+    const packageJsonContent = packageJsonFile?.content ?? null;
+
+    // Extract code-derived metadata (Tier 2)
+    const codeFiles = files.map(f => ({ filename: f.relativePath, content: f.content }));
+    const codeMetadata = extractCodeMetadata(codeFiles, packageJsonContent);
+
+    // Scan each file (existing logic — keep all of it unchanged)
     for (const file of files) {
-      // Skip non-SKILL.md documentation files entirely — they're not attack surface
       if (file.isDocFile) continue;
 
-      // MCP-aware extraction: parse package.json scripts as a separate scan target
       if (file.type === "npm_package") {
         const extraTargets = extractPackageJsonTargets(file.content, file.relativePath);
         for (const extra of extraTargets) {
@@ -86,7 +104,6 @@ export async function scanGitHubRepo(url: string): Promise<OrchestratorResult> {
         }
       }
 
-      // MCP-aware extraction: parse tool definition JSON files
       if (file.type === "config_file" && file.relativePath.toLowerCase().endsWith(".json")) {
         const toolTargets = extractToolDefinitionTargets(file.content, file.relativePath);
         for (const tool of toolTargets) {
@@ -103,13 +120,11 @@ export async function scanGitHubRepo(url: string): Promise<OrchestratorResult> {
       };
       const result = await engine.scan(target);
 
-      // Demote test file findings: critical→medium, high→low
       if (file.isTestFile) {
         for (const f of result.findings) {
           if (f.severity === "critical") f.severity = "medium";
           else if (f.severity === "high") f.severity = "low";
         }
-        // Recalculate score after demotion (with capability/intent weighting)
         result.score = result.findings.length === 0 ? 100 :
           Math.max(0, Math.round(100 - result.findings.reduce((sum, f) => {
             const pen: Record<string, number> = { critical: 40, high: 25, medium: 10, low: 3, info: 0 };
@@ -122,9 +137,29 @@ export async function scanGitHubRepo(url: string): Promise<OrchestratorResult> {
       results.push(result);
     }
 
-    return buildAggregateResult(results, rulesLoaded, files.length, startMs);
+    // Await GitHub metadata (should be done by now — ran in parallel)
+    const githubMeta = await metadataPromise;
+
+    // Deep scan: fetch additional signals if enabled
+    let deepSignals: { contributorCount?: number; topContributorPct?: number; starsPerDay?: number } = {};
+    if (deepScan && parsed && githubMeta.repo) {
+      deepSignals = await fetchDeepMetadata(parsed.owner, parsed.repo, githubMeta.repo).catch(() => ({}));
+    }
+
+    // Merge all metadata signals
+    const metadata: MetadataSignals = {
+      author: githubMeta.author,
+      repo: githubMeta.repo ? { ...githubMeta.repo, ...deepSignals } : null,
+      dependencies: codeMetadata.dependencies,
+      installInvasiveness: codeMetadata.installInvasiveness,
+      network: codeMetadata.network,
+      auth: codeMetadata.auth,
+      fetchedAt: new Date().toISOString(),
+      deepScan,
+    };
+
+    return buildAggregateResult(results, rulesLoaded, files.length, startMs, metadata);
   } finally {
-    // Always cleanup the cloned repo
     clone.cleanupFn?.();
   }
 }
@@ -213,24 +248,36 @@ function buildAggregateResult(
   results: ScanResult[],
   rulesLoaded: number,
   filesScanned: number,
-  startMs: number
+  startMs: number,
+  metadata?: MetadataSignals,
 ): OrchestratorResult {
   const allFindings = results.flatMap((r) => r.findings);
-
-  // Short-circuit: if ANY file triggered a confirmed-malicious rule, whole repo is DANGEROUS
   const shortCircuit = results.some((r) => r.shortCircuit);
 
-  // Aggregate score: worst file wins
   const worstScore = shortCircuit
     ? 0
     : results.length > 0
       ? Math.min(...results.map((r) => r.score))
       : 100;
 
-  const verdict = shortCircuit ? "DANGEROUS" as Verdict : scoreToVerdict(worstScore);
+  // Use new confidence calculator with metadata
+  const { confidence, caveats } = calculateConfidence(allFindings, shortCircuit, metadata);
 
-  // Confidence: short-circuit = 0.95, otherwise based on finding density and severity
-  const verdictConfidence = calculateVerdictConfidence(results, allFindings, shortCircuit);
+  // New verdict logic: CONDITIONAL_PASS when code is clean but confidence is low
+  let verdict: Verdict;
+  if (shortCircuit) {
+    verdict = "DANGEROUS";
+  } else if (worstScore >= 80 && confidence >= 0.70) {
+    verdict = "SAFE";
+  } else if (worstScore >= 80 && confidence < 0.70) {
+    verdict = "CONDITIONAL_PASS";
+  } else if (worstScore >= 50) {
+    verdict = "CAUTION";
+  } else if (worstScore >= 20) {
+    verdict = "SUSPICIOUS";
+  } else {
+    verdict = "DANGEROUS";
+  }
 
   return {
     success: true,
@@ -242,48 +289,12 @@ function buildAggregateResult(
     rulesLoaded,
     scanDuration: Date.now() - startMs,
     shortCircuit,
-    verdictConfidence,
+    verdictConfidence: confidence,
+    metadata,
+    caveats,
   };
 }
 
-/**
- * Calculate confidence in the verdict (0.0–1.0).
- * High confidence when: short-circuit fired, many high-severity findings, or zero findings.
- * Low confidence when: borderline score, mixed severity, few findings.
- */
-function calculateVerdictConfidence(
-  results: ScanResult[],
-  allFindings: import("@/engine/types").Finding[],
-  shortCircuit: boolean
-): number {
-  // Short-circuit rules are high-confidence by design
-  if (shortCircuit) return 0.95;
-
-  // No findings = high confidence it's safe
-  if (allFindings.length === 0) return 0.90;
-
-  // Count by severity
-  const criticalCount = allFindings.filter(f => f.severity === "critical").length;
-  const highCount = allFindings.filter(f => f.severity === "high").length;
-  const intentCount = allFindings.filter(f => isIntentRule(f.ruleId)).length;
-
-  // Many critical/high findings + intent rules = high confidence malicious
-  if (criticalCount >= 2 || (criticalCount >= 1 && intentCount >= 1)) return 0.90;
-  if (highCount >= 3) return 0.80;
-
-  // Borderline: some findings but not decisive
-  if (allFindings.length <= 2) return 0.50;
-
-  // Default moderate confidence
-  return 0.65;
-}
-
-function scoreToVerdict(score: number): Verdict {
-  if (score >= 80) return "SAFE";
-  if (score >= 50) return "CAUTION";
-  if (score >= 20) return "SUSPICIOUS";
-  return "DANGEROUS";
-}
 
 function inferType(filename: string): TargetType {
   const lower = filename.toLowerCase();
