@@ -4,7 +4,7 @@
  */
 
 import { ScanEngine, isIntentRule } from "@/engine/scanner";
-import type { ScanResult, ScanTarget, Verdict, TargetType } from "@/engine/types";
+import type { ScanResult, ScanTarget, Verdict, TargetType, MetadataSignals, Caveat } from "@/engine/types";
 import { loadAllRules } from "./rule-registry";
 import { createSemanticApiCall } from "./claude-api";
 import { cloneRepo } from "./github-fetcher";
@@ -23,6 +23,10 @@ export interface OrchestratorResult {
   shortCircuit?: boolean;
   /** Overall confidence in the aggregate verdict (0.0–1.0) */
   verdictConfidence?: number;
+  /** Metadata signals collected from GitHub API and code analysis */
+  metadata?: MetadataSignals;
+  /** Human-readable context caveats */
+  caveats?: Caveat[];
   error?: string;
 }
 
