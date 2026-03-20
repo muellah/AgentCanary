@@ -11,7 +11,7 @@ import { parseGitHubUrl } from "@/lib/github-fetcher";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { url } = body;
+    const { url, deepScan } = body;
 
     if (!url || typeof url !== "string") {
       return NextResponse.json(
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await scanGitHubRepo(url);
+    const result = await scanGitHubRepo(url, Boolean(deepScan));
 
     return NextResponse.json(result, {
       status: result.success ? 200 : 500,
