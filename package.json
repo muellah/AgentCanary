@@ -1,6 +1,6 @@
 {
   "name": "agentcanary",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "AI Agent Supply Chain Security Scanner — MCP servers and skills",
   "private": true,
   "scripts": {
