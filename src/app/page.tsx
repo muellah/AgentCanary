@@ -468,7 +468,7 @@ export default function HomePage() {
             </div>
           </div>
           <span className="text-xs text-gray-600 border border-gray-800 rounded px-2 py-1">
-            v0.1.0 MVP
+            v0.2.0
           </span>
         </div>
       </header>
