@@ -93,6 +93,46 @@ AgentCanary/
 4. **No caching** — each scan re-loads rules (fast enough for now)
 5. **Semantic rules need API key** — will gracefully skip if no key set
 6. **No progress streaming** — scan completes then shows all results at once
+7. **No metadata/context signals** — code-only analysis, no GitHub API metadata (see Phase 2)
+8. **No CVE checking** — dependencies not audited against vulnerability databases
+9. **No CONDITIONAL PASS verdict** — can't express "code is clean but context is concerning"
+
+---
+
+## Phase 2: Metadata Context Layer (Designed, Not Yet Built)
+
+**Spec:** `docs/superpowers/specs/2026-03-20-mcp-repo-safety-framework-design.md`
+
+### What It Adds
+
+A 14-dimension MCP Repo Safety Assessment Framework that runs alongside the existing code scanner. Metadata signals feed into the confidence score (not the code score), enabling verdicts like CONDITIONAL PASS — "code looks clean but context warrants caution."
+
+### New Capabilities
+
+- **GitHub API integration** — author credibility, repo vitals, license, contributor concentration
+- **Confidence-as-context** — clean code scan starts at 60% confidence; metadata pushes it to 85%+ (or down to 16%)
+- **Caveats system** — human-readable context notes ("repo < 90 days old", "CORS wildcard on localhost")
+- **CONDITIONAL PASS verdict** — score >= 80 but confidence < 70%
+- **Deep scan mode** — opt-in CVE audit, star velocity analysis, contributor concentration
+- **Enhanced code extractors** — network behavior classification, filesystem scope, auth assessment
+
+### New Files (Planned)
+
+```
+src/
+├── engine/
+│   └── confidence.ts          # New confidence calculator
+├── lib/
+│   ├── github-metadata.ts     # GitHub API fetcher (Tier 1+2)
+│   ├── deep-scanner.ts        # Tier 3 opt-in analysis
+│   └── metadata-extractors.ts # Extract network/filesystem/auth signals from code
+```
+
+### Three Tiers
+
+1. **Quick signals (<1s)** — author profile, repo age/stars, license, dep lifecycle, install invasiveness
+2. **Medium signals (1-3s)** — network behavior classification, filesystem scope, auth assessment, update mechanism
+3. **Deep scan (opt-in, 5-15s)** — contributor concentration, star velocity, CVE audit, privacy, community signals
 
 ## IMPORTANT: Rotate Your API Key
 
