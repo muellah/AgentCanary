@@ -1,0 +1,4 @@
+url,category,ac_verdict,ac_score,ac_confidence,ac_findings,ac_time_ms,claude_verdict,claude_score,claude_confidence,claude_concerns,agreement
+"https://github.com/modelcontextprotocol/servers","SAFE","SAFE","96","?","3","936","SKIP","","","","N/A"
+"https://github.com/modelcontextprotocol/typescript-sdk","SAFE","SAFE","100","?","0","1096","SKIP","","","","N/A"
+"https://github.com/modelcontextprotocol/python-sdk","SAFE","SAFE","97","?","1","1424","SKIP","","","","N/A"

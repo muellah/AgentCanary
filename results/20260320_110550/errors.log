@@ -1,0 +1,5 @@
+SCAN_ERROR|https://github.com/pulumi/mcp-server|curl failed
+SCAN_ERROR|https://github.com/edgarriba/prolink|curl failed
+SCAN_ERROR|https://github.com/oxgeneral/agentnet|curl failed
+SCAN_ERROR|https://github.com/particlefuture/MCPDiscovery|curl failed
+SCAN_ERROR|https://github.com/softvoyagers/pageshot-api|curl failed
