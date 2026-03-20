@@ -82,7 +82,7 @@ export async function fetchQuickMetadata(
       age: repoAge,
       lastPush: String(r.pushed_at || ""),
       openIssues: Number(r.open_issues_count || 0),
-      license: license ? String(license.spdx_id || license.key || null) : null,
+      license: license ? (license.spdx_id || license.key || null) as string | null : null,
     };
   }
 
