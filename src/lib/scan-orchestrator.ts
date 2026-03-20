@@ -269,8 +269,10 @@ function buildAggregateResult(
     verdict = "DANGEROUS";
   } else if (worstScore >= 80 && confidence >= 0.70) {
     verdict = "SAFE";
-  } else if (worstScore >= 80 && confidence < 0.70) {
+  } else if (worstScore >= 80 && confidence < 0.70 && metadata) {
     verdict = "CONDITIONAL_PASS";
+  } else if (worstScore >= 80) {
+    verdict = "SAFE"; // no metadata available (paste/file mode), trust code score
   } else if (worstScore >= 50) {
     verdict = "CAUTION";
   } else if (worstScore >= 20) {
