@@ -27,7 +27,7 @@ function getMaxSize(ext: string): number {
 }
 
 type ScanMode = "github" | "upload";
-type Verdict = "SAFE" | "CAUTION" | "SUSPICIOUS" | "DANGEROUS";
+type Verdict = "SAFE" | "CONDITIONAL_PASS" | "CAUTION" | "SUSPICIOUS" | "DANGEROUS";
 
 interface Finding {
   ruleId: string;
@@ -58,6 +58,7 @@ interface ScanResponse {
   scanDuration?: number;
   shortCircuit?: boolean;
   verdictConfidence?: number;
+  caveats?: { dimension: string; severity: string; text: string }[];
   error?: string;
 }
 
@@ -74,6 +75,7 @@ interface ValidationResult {
 
 const VERDICT_CONFIG: Record<Verdict, { emoji: string; color: string; bg: string; border: string }> = {
   SAFE: { emoji: "\u{1F7E2}", color: "text-emerald-400", bg: "bg-emerald-950/50", border: "border-emerald-800" },
+  CONDITIONAL_PASS: { emoji: "\u{1F7E1}", color: "text-yellow-400", bg: "bg-yellow-950/50", border: "border-yellow-800" },
   CAUTION: { emoji: "\u{1F7E1}", color: "text-yellow-400", bg: "bg-yellow-950/50", border: "border-yellow-800" },
   SUSPICIOUS: { emoji: "\u{1F7E0}", color: "text-orange-400", bg: "bg-orange-950/50", border: "border-orange-800" },
   DANGEROUS: { emoji: "\u{1F534}", color: "text-red-400", bg: "bg-red-950/50", border: "border-red-800" },
@@ -234,6 +236,7 @@ export default function HomePage() {
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState<ScanResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deepScan, setDeepScan] = useState(false);
 
   // Upload tab state
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -514,6 +517,15 @@ export default function HomePage() {
                   className="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-3 text-gray-200 placeholder-gray-600 focus:outline-none focus:border-amber-600"
                   onKeyDown={(e) => e.key === "Enter" && handleGithubScan()}
                 />
+                <label className="flex items-center gap-2 mt-3 text-sm text-gray-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={deepScan}
+                    onChange={(e) => setDeepScan(e.target.checked)}
+                    className="rounded border-gray-600 bg-gray-800"
+                  />
+                  Deep scan (slower — checks CVEs + contributor patterns)
+                </label>
               </div>
             ) : (
               <div className="space-y-4">
@@ -693,6 +705,22 @@ function ScanResults({ data }: { data: ScanResponse }) {
         {data.shortCircuit && (
           <div className="text-red-400 text-sm mt-2 font-semibold">
             Confirmed malicious pattern detected — short-circuit verdict applied
+          </div>
+        )}
+        {data.caveats && data.caveats.length > 0 && (
+          <div className="mt-3 space-y-1">
+            {data.caveats.map((caveat, i) => (
+              <div key={i} className="text-sm text-left">
+                <span className={
+                  caveat.severity === "critical" ? "text-red-400" :
+                  caveat.severity === "warning" ? "text-yellow-400" :
+                  "text-gray-400"
+                }>
+                  {caveat.severity === "critical" ? "\u{1F6A8}" : "\u{26A0}\u{FE0F}"}{" "}
+                  {caveat.text}
+                </span>
+              </div>
+            ))}
           </div>
         )}
       </div>
