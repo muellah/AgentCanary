@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 // Client-side upload validation constants (subset of upload-validator.ts Layer 1)
 const ACCEPTED_EXTENSIONS = new Set([".md", ".zip", ".json", ".yaml", ".yml"]);
 const BLOCKED_EXTENSIONS = new Set([".exe", ".dll", ".so", ".dylib", ".app", ".dmg", ".sh", ".bat", ".cmd", ".ps1"]);
@@ -59,6 +59,7 @@ interface ScanResponse {
   shortCircuit?: boolean;
   verdictConfidence?: number;
   caveats?: { dimension: string; severity: string; text: string }[];
+  relevanceWarning?: string;
   error?: string;
 }
 
@@ -388,6 +389,7 @@ export default function HomePage() {
         setInspectorErrorType("server");
       } else {
         setScanResult(data);
+        setSessionId(null); // Session is cleaned up server-side after scan
       }
     } catch (err) {
       if ((err as Error).name === "AbortError") {
@@ -479,7 +481,7 @@ export default function HomePage() {
           {/* Mode Tabs */}
           <div className="flex gap-2">
             <button
-              onClick={() => setMode("github")}
+              onClick={() => { setMode("github"); setScanResult(null); setError(null); }}
               className={`flex-1 py-3 rounded-lg font-medium transition-colors ${
                 mode === "github"
                   ? "bg-amber-900/50 border border-amber-700 text-amber-300"
@@ -490,7 +492,7 @@ export default function HomePage() {
               <div className="text-xs font-normal opacity-60 mt-0.5">MCP Servers &amp; Skill Repos</div>
             </button>
             <button
-              onClick={() => setMode("upload")}
+              onClick={() => { setMode("upload"); setScanResult(null); setError(null); }}
               className={`flex-1 py-3 rounded-lg font-medium transition-colors ${
                 mode === "upload"
                   ? "bg-amber-900/50 border border-amber-700 text-amber-300"
@@ -683,13 +685,198 @@ export default function HomePage() {
   );
 }
 
+// ---- Summary generation ----
+
+interface ScanSummary {
+  riskLine: string;
+  narrative: string;
+  topConcerns: string[];
+  positives: string[];
+  bottomLine: string;
+}
+
+function generateSummary(data: ScanResponse): ScanSummary {
+  const verdict = data.aggregateVerdict || "SAFE";
+  const findings = data.results?.flatMap((r) => r.findings) || [];
+  const score = data.aggregateScore ?? 100;
+
+  const critCount = findings.filter((f) => f.severity === "critical").length;
+  const highCount = findings.filter((f) => f.severity === "high").length;
+  const medCount = findings.filter((f) => f.severity === "medium").length;
+
+  // Risk line
+  const riskLabels: Record<string, string> = {
+    SAFE: "LOW RISK \u2014 No significant security issues detected",
+    CAUTION: "MODERATE RISK \u2014 Some concerns found, review recommended",
+    SUSPICIOUS: "HIGH RISK \u2014 Significant security concerns detected",
+    DANGEROUS: "CRITICAL RISK \u2014 Not safe to use without major fixes",
+  };
+  const riskLine = riskLabels[verdict] || riskLabels.CAUTION;
+
+  // Narrative
+  const parts: string[] = [];
+  if (data.shortCircuit) {
+    parts.push("Confirmed malicious patterns were detected in this code. This is not a false positive \u2014 the code contains known attack techniques.");
+  } else if (critCount > 0 || highCount > 0) {
+    const issues: string[] = [];
+    if (critCount > 0) issues.push(`${critCount} critical`);
+    if (highCount > 0) issues.push(`${highCount} high-severity`);
+    parts.push(`Found ${issues.join(" and ")} issue${critCount + highCount > 1 ? "s" : ""} that need attention before this code can be trusted.`);
+  } else if (medCount > 0) {
+    parts.push(`Found ${medCount} medium-severity issue${medCount > 1 ? "s" : ""}. No critical problems, but worth reviewing.`);
+  } else {
+    parts.push("No security issues were detected in the scanned code.");
+  }
+  const narrative = parts.join(" ");
+
+  // Top concerns — deduplicate by reportTitle, take critical/high only
+  const seen = new Set<string>();
+  const topConcerns: string[] = [];
+  for (const f of findings) {
+    if (f.severity !== "critical" && f.severity !== "high") continue;
+    if (seen.has(f.reportTitle)) continue;
+    seen.add(f.reportTitle);
+    topConcerns.push(f.reportTitle);
+    if (topConcerns.length >= 5) break;
+  }
+
+  // Positives
+  const positives: string[] = [];
+  if (!data.shortCircuit) {
+    if (score >= 80) positives.push("Code score is clean (no malicious patterns)");
+    if (findings.every((f) => f.severity !== "critical")) positives.push("No critical-severity findings");
+    const categories = new Set(findings.map((f) => f.category));
+    if (!categories.has("data_exfiltration")) positives.push("No data exfiltration detected");
+    if (!categories.has("credential_harvesting")) positives.push("No credential harvesting detected");
+    if (data.filesScanned && data.filesScanned > 10 && findings.length < 3) positives.push("Large codebase with very few findings");
+  }
+
+  // Bottom line
+  let bottomLine: string;
+  if (data.shortCircuit) {
+    bottomLine = "Do not install or run this code. It contains confirmed malicious behavior.";
+  } else if (verdict === "DANGEROUS") {
+    bottomLine = "This code has serious security issues. Do not use it in its current state without thorough review and fixes.";
+  } else if (verdict === "SUSPICIOUS") {
+    bottomLine = "Significant concerns were found. Proceed with caution and review the flagged issues carefully before using.";
+  } else if (verdict === "CAUTION") {
+    bottomLine = "Some issues were found but nothing critically dangerous. Review the findings and assess whether they matter for your use case.";
+  } else {
+    bottomLine = "No significant security issues found. As always, review code yourself before running it in sensitive environments.";
+  }
+
+  return { riskLine, narrative, topConcerns, positives, bottomLine };
+}
+
+/** Strip CVE codes and other internal references from recommendation text */
+function sanitizeRecommendation(text: string): string {
+  return text
+    .replace(/CVE-\d{4}-\d+/g, "a known vulnerability")
+    .replace(/\s+demonstrated how\b/g, " showed that")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+interface GroupedFinding {
+  finding: Finding;
+  count: number;
+  extraLocations: { line?: number; snippet?: string }[];
+}
+
+function groupFindings(findings: Finding[]): GroupedFinding[] {
+  const groups: GroupedFinding[] = [];
+  const seen = new Map<string, number>(); // key -> index in groups
+
+  for (const f of findings) {
+    const key = `${f.ruleId}::${f.reportTitle}::${f.severity}`;
+    const idx = seen.get(key);
+    if (idx !== undefined) {
+      groups[idx].count++;
+      if (f.location?.snippet && groups[idx].extraLocations.length < 3) {
+        groups[idx].extraLocations.push(f.location);
+      }
+    } else {
+      seen.set(key, groups.length);
+      groups.push({ finding: f, count: 1, extraLocations: [] });
+    }
+  }
+  return groups;
+}
+
+function ScanSummaryBlock({ data }: { data: ScanResponse }) {
+  const summary = generateSummary(data);
+  const verdict = data.aggregateVerdict || "SAFE";
+  const config = VERDICT_CONFIG[verdict];
+
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded-lg p-5 space-y-4">
+      {/* Risk line */}
+      <div className={`font-semibold text-sm ${config.color}`}>
+        {summary.riskLine}
+      </div>
+
+      {/* Narrative */}
+      <p className="text-sm text-gray-300">{summary.narrative}</p>
+
+      {/* Top concerns */}
+      {summary.topConcerns.length > 0 && (
+        <div>
+          <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">Key concerns</div>
+          <ul className="space-y-1">
+            {summary.topConcerns.map((concern, i) => (
+              <li key={i} className="text-sm text-gray-400 flex items-start gap-2">
+                <span className="text-red-500 shrink-0 mt-0.5">{"\u{25CF}"}</span>
+                {concern}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Positives */}
+      {summary.positives.length > 0 && (
+        <div>
+          <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">Positive signals</div>
+          <ul className="space-y-1">
+            {summary.positives.map((pos, i) => (
+              <li key={i} className="text-sm text-gray-400 flex items-start gap-2">
+                <span className="text-emerald-500 shrink-0 mt-0.5">{"\u{25CF}"}</span>
+                {pos}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Bottom line */}
+      <div className="border-t border-gray-800 pt-3">
+        <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Bottom line</div>
+        <p className="text-sm text-gray-200">{summary.bottomLine}</p>
+      </div>
+    </div>
+  );
+}
+
 function ScanResults({ data }: { data: ScanResponse }) {
   const verdict = data.aggregateVerdict || "SAFE";
   const config = VERDICT_CONFIG[verdict];
   const allFindings = data.results?.flatMap((r) => r.findings) || [];
+  const groupedFindings = groupFindings(allFindings);
+  const resultsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [data]);
 
   return (
-    <div className="space-y-4">
+    <div ref={resultsRef} className="space-y-4 scroll-mt-4">
+      {/* Relevance Warning */}
+      {data.relevanceWarning && (
+        <div className="bg-blue-950/40 border border-blue-800 rounded-lg p-4 flex items-start gap-3">
+          <span className="text-lg shrink-0">{"\u{2139}\u{FE0F}"}</span>
+          <p className="text-sm text-blue-300">{data.relevanceWarning}</p>
+        </div>
+      )}
       {/* Verdict Banner */}
       <div className={`${config.bg} border ${config.border} rounded-lg p-6 text-center`}>
         <div className="text-4xl mb-2">{config.emoji}</div>
@@ -725,50 +912,69 @@ function ScanResults({ data }: { data: ScanResponse }) {
         )}
       </div>
 
+      {/* Summary */}
+      <ScanSummaryBlock data={data} />
+
       {/* Findings List */}
-      {allFindings.length > 0 && (
+      {groupedFindings.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
-            Findings
+            Detailed Findings
           </h3>
-          {allFindings.map((finding, i) => (
+          {groupedFindings.map(({ finding, count, extraLocations }, i) => (
             <div
               key={`${finding.ruleId}-${i}`}
-              className="bg-gray-900 border border-gray-800 rounded-lg p-4"
+              className="bg-gray-900 border border-gray-800 rounded-lg p-4 space-y-2 overflow-hidden"
             >
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-2">
                 <span
-                  className={`text-xs font-mono px-2 py-0.5 rounded ${
+                  className={`text-xs font-mono px-2 py-0.5 rounded text-center shrink-0 mt-0.5 ${
                     SEVERITY_BADGE[finding.severity] || SEVERITY_BADGE.info
                   }`}
                 >
                   {finding.severity.toUpperCase()}
                 </span>
-                <div className="flex-1">
-                  <div className="font-medium text-gray-200">{finding.reportTitle}</div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {finding.ruleId} &middot; {finding.category}
-                  </div>
-                  {finding.location?.snippet && (
-                    <pre className="mt-2 text-xs bg-gray-950 border border-gray-800 rounded p-2 overflow-x-auto text-gray-400">
-                      {finding.location.line ? `Line ${finding.location.line}: ` : ""}
-                      {finding.location.snippet}
-                    </pre>
-                  )}
-                  {finding.recommendation && (
-                    <p className="mt-2 text-xs text-gray-500">
-                      {finding.recommendation.substring(0, 200)}
-                    </p>
+                <div className="font-medium text-gray-200 min-w-0">
+                  {finding.reportTitle}
+                  {count > 1 && (
+                    <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-800 rounded-full px-2 py-0.5">
+                      {count}x
+                    </span>
                   )}
                 </div>
               </div>
+              {finding.location?.snippet && (
+                <pre className="text-xs bg-gray-950 border border-gray-800 rounded p-2 overflow-x-auto whitespace-pre-wrap break-all text-gray-400">
+                  {finding.location.line ? `Line ${finding.location.line}: ` : ""}
+                  {finding.location.snippet}
+                </pre>
+              )}
+              {extraLocations.length > 0 && (
+                <div className="space-y-1">
+                  {extraLocations.map((loc, j) => (
+                    <pre key={j} className="text-xs bg-gray-950 border border-gray-800 rounded p-2 overflow-x-auto whitespace-pre-wrap break-all text-gray-500">
+                      {loc.line ? `Line ${loc.line}: ` : ""}{loc.snippet}
+                    </pre>
+                  ))}
+                  {count > 1 + extraLocations.length && (
+                    <div className="text-xs text-gray-600 pl-2">
+                      +{count - 1 - extraLocations.length} more occurrence{count - 1 - extraLocations.length > 1 ? "s" : ""}
+                    </div>
+                  )}
+                </div>
+              )}
+              {finding.recommendation && (
+                <p className="text-xs text-gray-500">
+                  {sanitizeRecommendation(finding.recommendation)}
+                </p>
+              )}
             </div>
           ))}
         </div>
       )}
 
       {/* No Findings */}
-      {allFindings.length === 0 && (
+      {groupedFindings.length === 0 && (
         <div className="text-center text-gray-500 py-4">
           No security issues detected. This doesn&apos;t guarantee safety — always review code manually.
         </div>

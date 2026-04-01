@@ -419,8 +419,7 @@ export async function scanDirectory(dirPath: string): Promise<OrchestratorResult
 }
 
 /**
- * Scan files from an upload session (single file or extracted zip).
- * Uses walkDirectory to find all scannable files in the session dir.
+ * Scan an uploaded file from a session directory
  */
 export async function scanUploadedFile(
   sessionDir: string,
