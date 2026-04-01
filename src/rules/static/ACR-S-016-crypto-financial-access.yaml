@@ -34,7 +34,7 @@ detection:
     - id: private_key_access
       description: "Cryptocurrency private key or seed phrase handling"
       type: regex
-      value: "(seed[_-]?phrase|mnemonic|keystore|wallet[_-]?key)\\s*[:=]"
+      value: "(seed[_-]?phrase|bip39[_-]?mnemonic|wallet[_-]?mnemonic|crypto[_-]?mnemonic|keystore|wallet[_-]?key|private[_-]?key[_-]?hex)\\s*[:=]"
       target: file_content
       case_sensitive: false
     - id: wallet_operations

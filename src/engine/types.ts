@@ -160,7 +160,7 @@ export interface Finding {
   evidence: string | null;
 }
 
-export type Verdict = "SAFE" | "CAUTION" | "SUSPICIOUS" | "DANGEROUS";
+export type Verdict = "SAFE" | "CONDITIONAL_PASS" | "CAUTION" | "SUSPICIOUS" | "DANGEROUS";
 
 export interface ScanResult {
   scanId: string;
@@ -219,5 +219,67 @@ export interface ScanResponse {
   aggregateVerdict?: Verdict;
   aggregateScore?: number;
   totalFindings?: number;
+  metadata?: MetadataSignals;
+  caveats?: Caveat[];
   error?: string;
+}
+
+// ============================================================
+// METADATA SIGNALS (Phase 2 — confidence context layer)
+// ============================================================
+
+export interface MetadataSignals {
+  author: {
+    login: string;
+    type: "User" | "Organization";
+    accountAge: number;       // days
+    publicRepos: number;
+    followers: number;
+    profileComplete: boolean; // has bio, email, or website
+  } | null;
+
+  repo: {
+    stars: number;
+    forks: number;
+    age: number;              // days since created_at
+    lastPush: string;         // ISO date
+    openIssues: number;
+    license: string | null;
+    description: string | null;
+    contributorCount?: number;       // deep scan only
+    topContributorPct?: number;      // deep scan only
+    starsPerDay?: number;            // deep scan only
+  } | null;
+
+  dependencies: {
+    total: number;
+    installHooks: string[];          // e.g. ["postinstall"]
+    knownCves?: { id: string; severity: string }[];  // deep scan only
+  };
+
+  installInvasiveness: {
+    externalPaths: string[];         // paths outside project dir
+    dotfilesModified: string[];      // .bashrc, .zshrc, etc.
+    toolConfigsModified: string[];   // .claude/*, .cursor/*, etc.
+  };
+
+  network: {
+    outboundDomains: string[];
+    phoneHome: boolean;
+    corsPolicy: string | null;       // "*", specific origin, or null
+    localhostBinding: string | null; // "127.0.0.1" or "0.0.0.0"
+  };
+
+  auth: {
+    dangerousEndpoints: { name: string; authenticated: boolean }[];
+  };
+
+  fetchedAt: string;                 // ISO timestamp
+  deepScan: boolean;                 // whether tier 3 ran
+}
+
+export interface Caveat {
+  dimension: string;     // e.g. "repo_age", "cors_policy"
+  severity: "info" | "warning" | "critical";
+  text: string;          // human-readable
 }
