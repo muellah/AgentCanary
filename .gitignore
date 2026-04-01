@@ -2,3 +2,18 @@ node_modules/
 .next/
 .superpowers/
 .worktrees/
+
+# OS
+.DS_Store
+
+# Build artifacts
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env*.local
+
+# Temp scan data
+tmp-scans/*/
